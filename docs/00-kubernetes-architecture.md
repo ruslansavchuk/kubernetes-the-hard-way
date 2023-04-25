@@ -29,4 +29,4 @@ Each worker node includes the following components:
 
 During the tutorial, we will configure each component one by one (in a more or less logical way) and try to understand a bit more deeply the responsibilities of each component.
 
-Next: [Container runtime](./docs/01-container-runtime.md)
+Next: [Container runtime](./01-container-runtime.md)
