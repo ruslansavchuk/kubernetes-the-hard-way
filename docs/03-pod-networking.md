@@ -198,6 +198,7 @@ May 03 13:43:43 example-server kubelet[23701]: I0503 13:43:43.862719   23701 eve
 As we can see cni plugin is not initialized. But what is cni plugin.
 
 > CNI stands for Container Networking Interface. It is a standard for defining how network connectivity is established and managed between containers, as well as between containers and the host system in a container runtime environment. Kubernetes uses CNI plugins to implement networking for pods.
+
 > A CNI plugin is a binary executable that is responsible for configuring the network interfaces and routes of a container or pod. It communicates with the container runtime (such as Docker or CRI-O) to set up networking for the container or pod.
 
 As we can see kubelet can't configure network for pod by himself, same as with containers, to configure network kubelet use some 'protocol' to communicate with 'someone' who can configure networ.
@@ -508,4 +509,4 @@ Output:
 POD ID              CREATED             STATE               NAME                        NAMESPACE           ATTEMPT             RUNTIME
 ```
 
-Next: [ETCD](./docs/04-etcd.md)
+Next: [ETCD](./04-etcd.md)

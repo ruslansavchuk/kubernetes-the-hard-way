@@ -243,4 +243,4 @@ Hello, World!
 
 ух ти тепер точно все працює, можна користуватись кубернетесом, але стоп у нас все ще є речі які на нашому графіку сірі давайте розбиратись
 
-Next: [Controller manager](./docs/07-controller-manager.md)
+Next: [Controller manager](./07-controller-manager.md)

@@ -267,4 +267,4 @@ hello-world   0/1     Pending   0          29s
 в дійсності, зоч у нас кублєт і є але він про сервер нічого незнає а сервер про нього
 потрібно цю проблємку вирішити
 
-Next: [Apiserver - Kubelet integration](./docs/06-apiserver-kubelet.md)
+Next: [Apiserver - Kubelet integration](./06-apiserver-kubelet.md)

@@ -202,4 +202,4 @@ nginx-deployment-5d9cbcf759-x4pk8   0/1     Pending   0          5m22s   <none> 
 
 бачимо що йому ніхто ще не проставив ноду, а без ноди кублєт сам не запустить под
 
-Next: [Scheduler](./docs/08-scheduler.md)
+Next: [Scheduler](./08-scheduler.md)

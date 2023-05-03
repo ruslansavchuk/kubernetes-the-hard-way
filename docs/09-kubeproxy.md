@@ -310,4 +310,4 @@ written to stdout
 ```
 ух ти у нас все вийшло
 
-Next: [DNS in Kubernetes](./docs/10-dns.md)
+Next: [DNS in Kubernetes](./10-dns.md)

@@ -1,13 +1,13 @@
 # ETCD
 
+At this point we already know that we can run pods even withour API server. But current aproach os not very confortable to use, to create pod we need to place some manifest in some place. it is not very comfortable to manage. Now we will start our jorney of configuring "real" kubernetes. And of cource all our manifests should be stored somewhere. 
+
 ![image](./img/04_cluster_architecture_etcd.png "Kubelet")
 
-це все звісно прикольно але потрібно всетаки почати конфігурувати нормальний кубернетес
-а для цього нам потрібно мати базу данних де можуть зберігатись всі необхідні кубернетесу речі
+For kubernetes (at least for original one it I can say so) we need to configura database called ETCD.
 
-і відповідно почати потрібно із ітісіді
+To configure db (and other kubennetes components in future) we will need some tools to configure certificates.
 
-потрібно встановити всі необхідні нам інструменти для генерації сертифікатів
 ```bash
 {
     wget -q --show-progress --https-only --timestamping \
@@ -18,7 +18,9 @@
 }
 ```
 
-тепер потрібно згенерувати сертифікат яким ми будемо підписувати всі інші сертифікати
+And now lets begin our etcd configuration journey.
+
+First of all we will create ca certificate file.
 
 ```bash
 {
@@ -61,14 +63,15 @@ cfssl gencert -initca ca-csr.json | cfssljson -bare ca
 }
 ```
 
-Результат:
+Generated files:
 ```
 ca-key.pem
 ca.csr
 ca.pem
 ```
 
-такс, а тепер нам потрібно згенерувати сертифікат який уже власне буде використовуватись самим ітісіді (але якщо бути точним то не тільки, але про то ми дізнаємось трохи згодом)
+Now, we need to create certificate which will be used by ETCD (not only ETCD, but about that in next parts) as server cert.
+
 ```bash
 {
 HOST_NAME=$(hostname -a)
@@ -103,22 +106,31 @@ cfssl gencert \
 }
 ```
 
-Завантажимо etcd
+Generated files:
 ```
+kubernetes.csr
+kubernetes-key.pem
+kubernetes.pem
+```
+
+Now, when we have all required certs, we need to download etcd
+
+```bash
 wget -q --show-progress --https-only --timestamping \
   "https://github.com/etcd-io/etcd/releases/download/v3.4.15/etcd-v3.4.15-linux-amd64.tar.gz"
 ```
 
-
-Розпакувати і помістити etcd у диреторію /usr/local/bin/
-```
+Decompres and install it to the proper folder
+```bash
 {
   tar -xvf etcd-v3.4.15-linux-amd64.tar.gz
   sudo mv etcd-v3.4.15-linux-amd64/etcd* /usr/local/bin/
 }
 ```
 
-```
+When etcd is installed, we need to move our generated certificates to the proper folder 
+
+```bash
 {
   sudo mkdir -p /etc/etcd /var/lib/etcd
   sudo chmod 700 /var/lib/etcd
@@ -128,7 +140,9 @@ wget -q --show-progress --https-only --timestamping \
 }
 ```
 
-```
+Create etcd service configuration file
+
+```bash
 cat <<EOF | sudo tee /etc/systemd/system/etcd.service
 [Unit]
 Description=etcd
@@ -137,11 +151,11 @@ Documentation=https://github.com/coreos
 [Service]
 Type=notify
 ExecStart=/usr/local/bin/etcd \\
+  --client-cert-auth \\
   --name etcd \\
   --cert-file=/etc/etcd/kubernetes.pem \\
   --key-file=/etc/etcd/kubernetes-key.pem \\
   --trusted-ca-file=/etc/etcd/ca.pem \\
-  --client-cert-auth \\
   --listen-client-urls https://127.0.0.1:2379 \\
   --advertise-client-urls https://127.0.0.1:2379 \\
   --data-dir=/var/lib/etcd
@@ -153,6 +167,18 @@ WantedBy=multi-user.target
 EOF
 ```
 
+Configuration options specified:
+- client-cert-auth - this configuration option tels etcd to enable the authentication of clients using SSL/TLS client certificates. When client-cert-auth is enabled, etcd requires that clients authenticate themselves by presenting a valid SSL/TLS client certificate during the TLS handshake. This certificate must be signed by a trusted certificate authority (CA) and include the client's identity information
+- name - used to specify the unique name of an etcd member
+- cert-file - path to the SSL/TLS certificate file that the etcd server presents to clients during the TLS handshake
+- key-file - path to the SSL/TLS private key file that corresponds to the SSL/TLS certificate presented by the etcd server during the TLS handshake
+- trusted-ca-file - path to the ca file which will be used by etcd to validate client certificate
+- listen-client-urls - specifies the network addresses on which the etcd server listens for client requests
+- specifies the network addresses that the etcd server advertises to clients for connecting to the server
+- data-dir - directory where etcd stores its data, including the key-value pairs in the etcd key-value store, snapshots, and transaction logs
+
+And finally we need to run our etcd service
+
 ```bash
 {
   sudo systemctl daemon-reload
@@ -161,10 +187,12 @@ EOF
 }
 ```
 
+And ensure that etcd is up and running
 ```bash
 systemctl status etcd
 ```
 
+Output:
 ```
 ● etcd.service - etcd
      Loaded: loaded (/etc/systemd/system/etcd.service; enabled; vendor preset: enabled)
@@ -178,6 +206,7 @@ systemctl status etcd
 ...
 ```
 
+When etcd is up and running we can check wheather we can connact to it.
 ```
 sudo ETCDCTL_API=3 etcdctl member list \
   --endpoints=https://127.0.0.1:2379 \
@@ -186,9 +215,10 @@ sudo ETCDCTL_API=3 etcdctl member list \
   --key=/etc/etcd/kubernetes-key.pem
 ```
 
+Output:
 Результат:
 ```bash
 8e9e05c52164694d, started, etcd, http://localhost:2380, https://127.0.0.1:2379, false
 ```
 
-Next: [Api Server](./docs/05-apiserver.md)
+Next: [Api Server](./05-apiserver.md)
