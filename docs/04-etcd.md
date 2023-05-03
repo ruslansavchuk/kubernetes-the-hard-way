@@ -1,4 +1,4 @@
-# Конфігурація ітісіді кластера
+# ETCD
 
 ![image](./img/04_cluster_architecture_etcd.png "Kubelet")
 
@@ -191,3 +191,4 @@ sudo ETCDCTL_API=3 etcdctl member list \
 8e9e05c52164694d, started, etcd, http://localhost:2380, https://127.0.0.1:2379, false
 ```
 
+Next: [Api Server](./docs/05-apiserver.md)

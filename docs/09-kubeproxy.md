@@ -309,3 +309,5 @@ writing to stdout
 written to stdout
 ```
 ух ти у нас все вийшло
+
+Next: [DNS in Kubernetes](./docs/10-dns.md)

@@ -1,7 +1,9 @@
-# Трохи про мережу в кубернетесі
+# Pod networking
 
-Давайте спробуємо запустити нджінкс
-Як і раніше ми просто покладемо правильний файл у правильне місце
+In this part of tutorial, we will have closer look at the container networking
+And lets start with nginx runned inside container.
+
+Create manifest for nginx static pod
 
 ```bash
 cat <<EOF> /etc/kubernetes/manifests/static-nginx.yml
@@ -15,15 +17,30 @@ spec:
   hostNetwork: true
   containers:
   - name: nginx
-    image: nginx
+    image: ubuntu/nginx
 EOF
 ```
 
-можна навіть перевірити чи контейнер хапустивсь
+After manifest created we can check wheather our nginx container is created
+
+```bash
+crictl pods
+```
+
+Output:
+```
+POD ID              CREATED              STATE               NAME                          NAMESPACE           ATTEMPT             RUNTIME
+14662195d6829       About a minute ago   Ready               static-nginx-example-server   default             0                   (default)
+```
+
+As we can see out nginx container is up and running.
+Let's check wheather it works as expected.
+
 ```bash
 curl localhost
 ```
 
+Output:
 ```
 <!DOCTYPE html>
 <html>
@@ -50,17 +67,8 @@ Commercial support is available at
 </html>
 ```
 
-```bash
-crictl pods
-```
+Now, lets try to create 1 more nginx container.
 
-```
-POD ID              CREATED              STATE               NAME                          NAMESPACE           ATTEMPT             RUNTIME
-e8720dee2b08b       About a minute ago   Ready               static-nginx-example-server   default             0                   (default)
-```
-
-так, це ж контейнер, тут все чотко, можна щось робити і все має працювати 
-давайте створимо ще 1
 
 ```bash
 cat <<EOF> /etc/kubernetes/manifests/static-nginx-2.yml
@@ -74,14 +82,25 @@ spec:
   hostNetwork: true
   containers:
   - name: nginx
-    image: nginx
+    image: ubuntu/nginx
 EOF
 ```
 
-але стаять, а як ми на нього потрапимо, із першим все було просто ми просто пішли на 80 порт, хоча також питання зо там взагалі відбулось
+Again will try to check if our pod is in running state.
 
-поки не особо ясно, але у нас є чотка утіліта для дебага
-то давайте глянемо що там за контейнери існують
+```bash
+crictl pods
+```
+
+Output:
+```
+POD ID              CREATED             STATE               NAME                            NAMESPACE           ATTEMPT             RUNTIME
+a299a86893e28       40 seconds ago      Ready               static-nginx-2-example-server   default             0                   (default)
+14662195d6829       4 minutes ago       Ready               static-nginx-example-server     default             0                   (default)
+```
+
+Looks like out pod is up, but if we will try to check the underlying containers we may be surprised.
+
 
 ```bash
 crictl ps -a
@@ -93,12 +112,14 @@ CONTAINER           IMAGE               CREATED             STATE               
 0e47618b39c09       6efc10a0510f1       4 minutes ago       Running             nginx               0                   e8720dee2b08b
 ```
 
-такс, що за неподобство, чому 1 контейнер не запущений, давайте розбиратись, і куди першим ділом потрібно лізти, звісно у логи
+As you can see our second container is in exit state.
+To check the reason of the Exit state we can review container logs
 
 ```bash
 crictl logs $(crictl ps -q -s Exited)
 ```
 
+In the logs, you shoud see something like this
 ```
 ...
 2023/04/18 20:49:47 [emerg] 1#1: bind() to 0.0.0.0:80 failed (98: Address already in use)
@@ -106,17 +127,91 @@ nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)
 ...
 ```
 
-такс, біда, це що виходить що ми не можемо запусти 2 нджінкса?
-всьо розхожимось, докер в 100 раз лучше)))
-але ні, не все так просто
+As we can see, the reason of the exit state - adress already in use.
+Our address already in use by our other container.
 
-справа в тому що окім всього існує ще такий собі стандарт який говорить як алаштовувати мережу для контейнера - CNI
-а ми його поки ніяким чином не конфігурували, і похорошому всі ті контейнери не мали б створитись якби не 1 чіт, ми їх всіх створювали у хостівій мережі, так якби ми просто запускаємо якусь програму, тож давайте зараз налаштуємо якийсь мережевий плагін
+We received this error because we run two pods with configuration
+```
+...
+spec:
+  hostNetwork: true
+...
+```
+
+As we can see our pod are runned in host network.
+Lets try to fix this by updating our manifests to run containers in not host network.
+
+```bash
+{
+cat <<EOF> /etc/kubernetes/manifests/static-nginx.yml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: static-nginx
+  labels:
+    app: static-nginx
+spec:
+  containers:
+  - name: nginx
+    image: ubuntu/nginx
+EOF
+
+cat <<EOF> /etc/kubernetes/manifests/static-nginx-2.yml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: static-nginx-2
+  labels:
+    app: static-nginx-2
+spec:
+  containers:
+  - name: nginx
+    image: ubuntu/nginx
+EOF
+}
+```
+
+And check our pods once again
+
+```bash
+crictl pods
+```
+
+Output:
+```
+POD ID              CREATED             STATE               NAME                NAMESPACE           ATTEMPT             RUNTIME
+```
+
+Very strange, we see nothing.
+To define the reason why no pods created lets review the kubelet logs (but as we know what we are looking for, we will chit a bit)
+```bash
+journalctl -u kubelet | grep NetworkNotReady
+```
+
+Output:
+```
+...
+May 03 13:43:43 example-server kubelet[23701]: I0503 13:43:43.862719   23701 event.go:291] "Event occurred" object="default/static-nginx-example-server" kind="Pod" apiVersion="v1" type="Warning" reason="NetworkNotReady" message="network is not ready: container runtime network not ready: NetworkReady=false reason:NetworkPluginNotReady message:Network plugin returns error: cni plugin not initialized"
+...
+```
+
+As we can see cni plugin is not initialized. But what is cni plugin.
+
+> CNI stands for Container Networking Interface. It is a standard for defining how network connectivity is established and managed between containers, as well as between containers and the host system in a container runtime environment. Kubernetes uses CNI plugins to implement networking for pods.
+> A CNI plugin is a binary executable that is responsible for configuring the network interfaces and routes of a container or pod. It communicates with the container runtime (such as Docker or CRI-O) to set up networking for the container or pod.
+
+As we can see kubelet can't configure network for pod by himself, same as with containers, to configure network kubelet use some 'protocol' to communicate with 'someone' who can configure networ.
+
+Now, we will configure the cni plugin 1for our instalation.
+
+First of all we need to download that plugin
 
 ```bash
 wget -q --show-progress --https-only --timestamping \
   https://github.com/containernetworking/plugins/releases/download/v0.9.1/cni-plugins-linux-amd64-v0.9.1.tgz
 ```
+
+Now, we will create proper folders structure for our plugin
 
 ```bash
 sudo mkdir -p \
@@ -124,11 +219,20 @@ sudo mkdir -p \
   /opt/cni/bin
 ```
 
+here:
+- net.d - folder where we will store our plugin configuration files
+- bin - folder for plugin binaries
+
+Now, we will untar our plugin to proper folder
+
 ```bash
 sudo tar -xvf cni-plugins-linux-amd64-v0.9.1.tgz -C /opt/cni/bin/
 ```
 
+And create plugin configuration
+
 ```bash
+{
 cat <<EOF | sudo tee /etc/cni/net.d/10-bridge.conf
 {
     "cniVersion": "0.4.0",
@@ -146,9 +250,7 @@ cat <<EOF | sudo tee /etc/cni/net.d/10-bridge.conf
     }
 }
 EOF
-```
 
-```bash
 cat <<EOF | sudo tee /etc/cni/net.d/99-loopback.conf
 {
     "cniVersion": "0.4.0",
@@ -156,7 +258,10 @@ cat <<EOF | sudo tee /etc/cni/net.d/99-loopback.conf
     "type": "loopback"
 }
 EOF
+}
 ```
+
+And finaly we need to update our kubelet config (add network-plugin configuration option)
 
 ```bash
 cat <<EOF | sudo tee /etc/systemd/system/kubelet.service
@@ -184,6 +289,8 @@ WantedBy=multi-user.target
 EOF
 ```
 
+Of course restart it
+
 ```bash
 {
   sudo systemctl daemon-reload
@@ -191,45 +298,67 @@ EOF
 }
 ```
 
+And check kubelet status
+
 ```bash
 sudo systemctl status kubelet
 ```
 
-ну що, давайте щось запустимо
-
-```bash
-cat <<EOF> /etc/kubernetes/manifests/static-nginx-2.yml
-apiVersion: v1
-kind: Pod
-metadata:
-  name: static-nginx-2
-  labels:
-    app: static-nginx-2
-spec:
-  # hostNetwork: true
-  containers:
-  - name: nginx
-    image: ubuntu/nginx
-EOF
+Output:
 ```
+● kubelet.service - kubelet: The Kubernetes Node Agent
+     Loaded: loaded (/etc/systemd/system/kubelet.service; enabled; vendor preset: enabled)
+     Active: active (running) since Wed 2023-05-03 13:53:03 UTC; 15s ago
+       Docs: https://kubernetes.io/docs/home/
+   Main PID: 86730 (kubelet)
+      Tasks: 13 (limit: 2275)
+     Memory: 46.8M
+     CGroup: /system.slice/kubelet.service
+             └─86730 /usr/local/bin/kubelet --container-runtime=remote --container-runtime-endpoint=unix:///var/run/containerd/containerd.sock --image-pull-progress-deadline=2m --file-che>
+```
+
+Now, when we fixed everything, lets ckeck if our pods are in running state
 
 ```bash
 crictl pods
 ```
 
+Outout:
+```
+POD ID              CREATED             STATE               NAME                            NAMESPACE           ATTEMPT             RUNTIME
+45feb5b5be77c       2 minutes ago       Ready               static-nginx-2-example-server   default             0                   (default)
+b9c684fa20082       2 minutes ago       Ready               static-nginx-example-server     default             0                   (default)
+```
+
+Pods are ok, but what about containers
+
 ```bash
 crictl ps
 ```
 
-такс, воно то все звісно добре, але як отимати айпішнік
-ну тут потрібно трохи пошаманити
+Output:
+```
+CONTAINER           IMAGE               CREATED             STATE               NAME                ATTEMPT             POD ID
+6b1f7855bfdb1       6efc10a0510f1       3 minutes ago       Running             nginx               0                   45feb5b5be77c
+1dde689e499bb       6efc10a0510f1       3 minutes ago       Running             nginx               0                   b9c684fa20082
+```
+
+They are also in running state
+
+On this step if we will try to curl localhost nothing will happen.
+Our pods are runned in separate network namespaces, and each pod has own ip address.
+We need to define it.
 
 ```bash
+{
 PID=$(crictl pods --label app=static-nginx-2 -q)
 CID=$(crictl ps -q --pod $PID)
 crictl exec $CID ip a
+}
 ```
 
+Output:
+```
 ...
 3: cnio0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
     link/ether c2:44:0d:6d:17:61 brd ff:ff:ff:ff:ff:ff
@@ -240,13 +369,19 @@ crictl exec $CID ip a
 ...
 ```
 
-пам'ятаємо що ми створювали підмережу 10.240.1.0/24 при конфігураціїх нашого плагіну
-знаючи що контейнер у нас такий поки 1 можна і підбором (із 1) вибрати айішнік
+During the plugin configuration we remember that we configure the subnet pod our pods to be 10.240.1.0/24.
+Now, we can curl our container.
 
 ```bash
-curl 10.240.1.1
+{
+PID=$(crictl pods --label app=static-nginx-2 -q)
+CID=$(crictl ps -q --pod $PID)
+IP=$(crictl exec $CID ip a | grep 240 | awk '{print $2}' | cut -f1 -d'/')
+curl $IP
+}
 ```
 
+Output:
 ```
 <!DOCTYPE html>
 <html>
@@ -273,53 +408,12 @@ Commercial support is available at
 </html>
 ```
 
-думаю для гарантії потрібно ще 1 контейнер створити
+As we can see we successfully reached out container.
 
-```bash
-cat <<EOF> /etc/kubernetes/manifests/static-nginx-3.yml
-apiVersion: v1
-kind: Pod
-metadata:
-  name: static-nginx-3
-  labels:
-    app: static-nginx-3
-spec:
-  # hostNetwork: true
-  containers:
-  - name: nginx
-    image: ubuntu/nginx
-EOF
-```
+But we remember that cni plugin also responsible to configure communication between containers.
+Lets check
 
-```bash
-PID=$(crictl pods --label app=static-nginx-3 -q)
-CID=$(crictl ps -q --pod $PID)
-crictl exec $CID ip a
-```
-
-```bash
-1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
-    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
-    inet 127.0.0.1/8 scope host lo
-       valid_lft forever preferred_lft forever
-    inet6 ::1/128 scope host
-       valid_lft forever preferred_lft forever
-3: eth0@if9: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default
-    link/ether 26:24:72:70:b7:9f brd ff:ff:ff:ff:ff:ff link-netnsid 0
-    inet 10.240.1.7/24 brd 10.240.1.255 scope global eth0
-       valid_lft forever preferred_lft forever
-    inet6 fe80::2424:72ff:fe70:b79f/64 scope link
-       valid_lft forever preferred_lft forever
-```
-
-отримуємо потрібний нам айпі
-
-такс, тепер ми знайємо щу у 1 контейнера 1 айпішнік а у іншого інший
-тепер прийшов час подивитись чи можуть вони комунікувати між собою
-
-```bash
-crictl exec -it $CID bash
-```
+To do that we will run 1 more pod with busybox inside
 
 ```bash
 cat <<EOF> /etc/kubernetes/manifests/static-pod.yml
@@ -338,18 +432,80 @@ spec:
 EOF
 ```
 
-```bash
-PID=$(crictl pods --label app=static-pod -q)
-CID=$(crictl ps -q --pod $PID)
-crictl exec -it $CID sh
+Now, lets, check and ensure that pod created
 
-wget -O - 10.240.1.7
-exit
+```bash
+crictl pods
 ```
 
-ну і тепер все почистити після себе
+Output:
+```
+POD ID              CREATED             STATE               NAME                            NAMESPACE           ATTEMPT             RUNTIME
+80047283230cc       21 seconds ago      Ready               static-pod-example-server       default             0                   (default)
+a6881b7bba036       18 minutes ago      Ready               static-nginx-example-server     default             0                   (default)
+4dd70fb8f5f53       18 minutes ago      Ready               static-nginx-2-example-server   default             0                   (default)
+```
 
+As pod is in running state, we can check wheather our other nging pods are available
 
+```bash
+{
+PID=$(crictl pods --label app=static-nginx-2 -q)
+CID=$(crictl ps -q --pod $PID)
+IP=$(crictl exec $CID ip a | grep 240 | awk '{print $2}' | cut -f1 -d'/')
+PID_0=$(crictl pods --label app=static-pod -q)
+CID_0=$(crictl ps -q --pod $PID_0)
+crictl exec $CID_0 wget -O - $IP
+}
+```
+
+Output: 
+```
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+html { color-scheme: light dark; }
+body { width: 35em; margin: 0 auto;
+font-family: Tahoma, Verdana, Arial, sans-serif; }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, the nginx web server is successfully installed and
+working. Further configuration is required.</p>
+
+<p>For online documentation and support please refer to
+<a href="http://nginx.org/">nginx.org</a>.<br/>
+Commercial support is available at
+<a href="http://nginx.com/">nginx.com</a>.</p>
+
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+Connecting to 10.240.1.4 (10.240.1.4:80)
+writing to stdout
+-                    100% |********************************|   615  0:00:00 ETA
+written to stdout
+```
+
+As we can see we successfully reached our container from busybox.
+
+Now, we will clean up workplace
 ```bash
 rm /etc/kubernetes/manifests/static-*
 ```
+
+And check if app pods are removed
+
+```bash
+crictl pods
+```
+
+Output:
+```
+POD ID              CREATED             STATE               NAME                        NAMESPACE           ATTEMPT             RUNTIME
+```
+
+Next: [ETCD](./docs/04-etcd.md)

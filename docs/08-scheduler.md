@@ -147,3 +147,5 @@ Hello, World from deployment!
 Hello, World from deployment!
 ...
 ```
+
+Next: [Kube proxy](./docs/09-kubeproxy.md)
