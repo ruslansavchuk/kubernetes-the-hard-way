@@ -1,52 +1,36 @@
-# dns
+# DNS in Kubernetes
 
-такс, це звісно приколно що можна по айпішніку, але я читав що можна по назві сервісу звертатись
+Again, it is very interesting to access the service by ip but we know that we can access it by service name
+Lets try,
 
 ```bash
-kubectl exec hello-world -- wget -O - nginx-service
+kubectl exec busy-box -- wget -O - nginx-service
 ```
 
-не особо працює, щось пішло не так
+and nothing happen
 
-а так тому, що ми не поставили деенес адон
-але нічого, зараз ми то виправимо
+the reason is DNS server which we still not configured
+
+but dns server we can install from kubernetes directly
 
 ```bash
 kubectl apply -f https://storage.googleapis.com/kubernetes-the-hard-way/coredns-1.8.yaml
 ```
 
-ну у мене не особо запрацювало
-потрібно зробити зміни у кублєті
-```bash
-cat <<EOF | sudo tee /etc/systemd/system/kubelet.service
-[Unit]
-Description=Kubernetes Kubelet
-Documentation=https://github.com/kubernetes/kubernetes
-After=containerd.service
-Requires=containerd.service
-
-[Service]
-ExecStart=/usr/local/bin/kubelet \\
-  --config=/var/lib/kubelet/kubelet-config.yaml \\
-  --container-runtime=remote \\
-  --container-runtime-endpoint=unix:///var/run/containerd/containerd.sock \\
-  --image-pull-progress-deadline=2m \\
-  --kubeconfig=/var/lib/kubelet/kubeconfig \\
-  --network-plugin=cni \\
-  --register-node=true \\
-  --v=2
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-EOF
-```
+and try to erpeat
 
 ```bash
-{
-  sudo systemctl daemon-reload
-  sudo systemctl enable kubelet
-  sudo systemctl restart kubelet
-}
+kubectl exec busy-box -- wget -O - nginx-service
 ```
+
+
+Output:
+```
+Hello from pod: nginx-deployment-68b9c94586-zh9vn
+Connecting to nginx-service (10.32.0.230:80)
+writing to stdout
+-                    100% |********************************|    50  0:00:00 ETA
+written to stdout
+```
+
+great, everything works as expected

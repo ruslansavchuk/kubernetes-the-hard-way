@@ -1,14 +1,14 @@
 # Controller manager
 
-![image](./img/07_cluster_architecture_controller_manager.png "Kubelet")
+In this part we will configure controller-manager.
 
-для того щоб відчути весь смак - давайте почнемо із того що вернемось трохи не до конфігураційних всяких штук а до абстракцій кубернетесу
+![image](./img/08_cluster_architecture_controller_manager.png "Kubelet")
 
-і власне наша наступна абстракція - деплоймент
+>Controller Manager is a core component responsible for managing various controllers that regulate the desired state of the cluster. It runs as a separate process on the Kubernetes control plane and includes several built-in controllers
 
-тож давайте її створимо
-
+To see controller manager in action, we will create deployment before controller manager configured.
 ```bash
+{
 cat <<EOF> deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
@@ -32,24 +32,31 @@ spec:
 EOF
 
 kubectl apply -f deployment.yaml
+}
 ```
 
+Check created deployment status:
 ```bash
 kubectl get deploy
 ```
 
+Output:
 ```
 NAME               READY   UP-TO-DATE   AVAILABLE   AGE
 nginx-deployment   0/1     0            0           24s
 ```
 
-такс, щось пішло не так
-чомусь наші поди не створюються - а мають
+As we can se our deployment isn't in ready state.
 
-за те щоб поди створювались відповідає контроллєр менеджер, а у нас його немає
-тож давайте цю проблему вирішувати
+As we already mentioned, in kubernetes controller manager is responsible to ensure that desired state of the cluster equals to the actual state. In our case it means that deployment controller should create replicaset and replicaset controller should create pod which will be assigned to nodes by scheduler. But as controller manager is not configured - nothing happen with created deployment.
 
+So, lets configure controller manager.
 
+## certificates
+We will start with certificates.
+
+As you remeber we configured our API server cto use client certificate to authenticate user.
+So, lets create proper certificate for the controller manager
 ```bash
 {
 cat > kube-controller-manager-csr.json <<EOF
@@ -77,9 +84,30 @@ cfssl gencert \
   -config=ca-config.json \
   -profile=kubernetes \
   kube-controller-manager-csr.json | cfssljson -bare kube-controller-manager
-
 }
 ```
+
+Created certs:
+```
+kube-controller-manager.csr
+kube-controller-manager-key.pem
+kube-controller-manager.pem
+```
+
+The most interesting configuration options:
+- cn(common name) - value, api server will use as a client name during authorization
+- o(organozation) - user group controller manager will use during authorization
+
+We specified "system:kube-controller-manager" in the organization. It says api server that the client who uses which certificate belongs to the system:kube-controller-manager group.
+
+Now, we will distribute ca certificate, this ????
+```bash
+sudo cp ca-key.pem /var/lib/kubernetes/
+```
+
+## configuration
+
+After the certificate files created we can create configuration files for the controller manager.
 
 ```bash
 {
@@ -104,11 +132,20 @@ cfssl gencert \
 }
 ```
 
+We created kubernetes configuration file, which says controller manager where api server is configured and which certificates to use communicating with it
+
+Now, we can distribute created configuration file.
+```bash
+sudo mv kube-controller-manager.kubeconfig /var/lib/kubernetes/
+```
+
+After all required configuration file created, we need to download controller manager binaries.
 ```bash
 wget -q --show-progress --https-only --timestamping \
   "https://storage.googleapis.com/kubernetes-release/release/v1.21.0/bin/linux/amd64/kube-controller-manager"
 ```
 
+And install it
 ```bash
 {
   chmod +x kube-controller-manager
@@ -116,11 +153,7 @@ wget -q --show-progress --https-only --timestamping \
 }
 ```
 
-```bash
-sudo mv kube-controller-manager.kubeconfig /var/lib/kubernetes/
-sudo cp ca-key.pem /var/lib/kubernetes/
-```
-
+Now, we can create configuration file for controller manager service
 ```bash
 cat <<EOF | sudo tee /etc/systemd/system/kube-controller-manager.service
 [Unit]
@@ -149,6 +182,7 @@ WantedBy=multi-user.target
 EOF
 ```
 
+After configuration file created, we can start controller manager
 ```bash
 {
   sudo systemctl daemon-reload
@@ -157,10 +191,12 @@ EOF
 }
 ```
 
+And finaly we can check controller manadger status
 ```bash
 sudo systemctl status kube-controller-manager
 ```
 
+Output:
 ```
 ● kube-controller-manager.service - Kubernetes Controller Manager
      Loaded: loaded (/etc/systemd/system/kube-controller-manager.service; enabled; vendor preset: enabled)
@@ -174,32 +210,31 @@ sudo systemctl status kube-controller-manager
 ...
 ```
 
-ну контроллер менеджер як бачимо завівся, то може і поди створились?
-давайте перевіримо
-
+As you can see our controller manager is up and running. So we can continue with our deployment.
 ```bash
-kubectl get pod
+kubectl get deploy
 ```
 
+Output:
 ```
-NAME                                READY   STATUS    RESTARTS   AGE
-hello-world                         1/1     Running   0          27m
-nginx-deployment-5d9cbcf759-x4pk8   0/1     Pending   0          79s
+NAME         READY   UP-TO-DATE   AVAILABLE   AGE
+deployment   1/1     1            1           2m8s
 ```
 
-такс, ну под уже сворився, але він ще у статусі пендінг якось не особо цікаво
-
-відповідь на питання чого по ще досі не запущений дуже проста
+As you can see our deployment is up anr running, all desired pods are also in running state
 ```bash
-kubectl get pod -o wide
+kubectl get pods
 ```
 
+Output:
 ```
-NAME                                READY   STATUS    RESTARTS   AGE     IP           NODE             NOMINATED NODE   READINESS GATES
-hello-world                         1/1     Running   0          31m     10.240.1.9   example-server   <none>           <none>
-nginx-deployment-5d9cbcf759-x4pk8   0/1     Pending   0          5m22s   <none>       <none>           <none>           <none>
+NAME                          READY   STATUS    RESTARTS   AGE
+deployment-74fc7cdd68-89rqw   1/1     Running   0          67s
 ```
 
-бачимо що йому ніхто ще не проставив ноду, а без ноди кублєт сам не запустить под
+Now, when our controller manager configured, lets clean up our workspace.
+```bash
+kubectl delete -f deployment.yaml
+```
 
-Next: [Scheduler](./08-scheduler.md)
+Next: [Kube-proxy](./09-kubeproxy.md)

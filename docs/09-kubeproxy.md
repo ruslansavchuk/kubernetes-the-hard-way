@@ -1,11 +1,26 @@
-# Kubeproxy
+# Kube-proxy
 
 ![image](./img/09_cluster_architecture_proxy.png "Kubelet")
 
 такс, 
 
 ```bash
+{
 cat <<EOF> nginx-deployment.yml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-conf
+data:
+  default.conf: |
+    server {
+        listen 80;
+        server_name _;
+        location / {
+            return 200 "Hello from pod: \$hostname\n";
+        }
+    }
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -25,25 +40,66 @@ spec:
         image: nginx:1.21.3
         ports:
         - containerPort: 80
+        volumeMounts:
+        - name: nginx-conf
+          mountPath: /etc/nginx/conf.d
+      volumes:
+      - name: nginx-conf
+        configMap:
+          name: nginx-conf
 EOF
 
 kubectl apply -f nginx-deployment.yml
+}
 ```
 
 ```bash
 kubectl get pod -o wide
 ```
 
+Output:
 ```
-NAME                                READY   STATUS    RESTARTS   AGE    IP            NODE             NOMINATED NODE   READINESS GATES
-hello-world                         1/1     Running   0          109m   10.240.1.9    example-server   <none>           <none>
-nginx-deployment-5d9cbcf759-x4pk8   1/1     Running   0          84m    10.240.1.14   example-server   <none>           <none>
+NAME                               READY   STATUS    RESTARTS   AGE   IP            NODE             NOMINATED NODE   READINESS GATES
+nginx-deployment-db9778f94-2zv7x   1/1     Running   0          63s   10.240.1.12   example-server   <none>           <none>
+nginx-deployment-db9778f94-q5jx4   1/1     Running   0          63s   10.240.1.10   example-server   <none>           <none>
+nginx-deployment-db9778f94-twx78   1/1     Running   0          63s   10.240.1.11   example-server   <none>           <none>
 ```
 
-нам потрібна айпі адреса поду з деплойменту, в моєму випадку 10.240.1.10
-запам'ятаємо її
+now, we will run busybox container and will try to access our pods from other container
 
 ```bash
+{
+cat <<EOF> pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: busy-box
+spec:
+  containers:
+    - name: busy-box
+      image: busybox
+      command: ['sh', '-c', 'while true; do echo "Busy"; sleep 1; done']
+EOF
+
+kubectl apply -f pod.yaml
+}
+```
+
+and execute command from our container
+
+```bash
+kubectl exec busy-box -- wget -O - $(kubectl get pod -o wide | grep nginx | awk '{print $6}' | head -n 1)
+```
+
+Output:
+```
+error: unable to upgrade connection: Forbidden (user=kubernetes, verb=create, resource=nodes, subresource=proxy)
+```
+
+error occured because api server has no access to execute commands
+
+```bash
+{
 cat <<EOF> rbac-create.yml
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
@@ -69,44 +125,27 @@ roleRef:
 EOF
 
 kubectl apply -f rbac-create.yml
+}
 ```
 
-```
-kubectl exec hello-world -- wget -O - 10.240.1.14
+and execute command from our container
+
+```bash
+kubectl exec busy-box -- wget -O - $(kubectl get pod -o wide | grep nginx | awk '{print $6}' | head -n 1)
 ```
 
+Output:
 ```
-<!DOCTYPE html>
-<html>
-<head>
-<title>Welcome to nginx!</title>
-<style>
-html { color-scheme: light dark; }
-body { width: 35em; margin: 0 auto;
-font-family: Tahoma, Verdana, Arial, sans-serif; }
-</style>
-</head>
-<body>
-<h1>Welcome to nginx!</h1>
-<p>If you see this page, the nginx web server is successfully installed and
-working. Further configuration is required.</p>
-
-<p>For online documentation and support please refer to
-<a href="http://nginx.org/">nginx.org</a>.<br/>
-Commercial support is available at
-<a href="http://nginx.com/">nginx.com</a>.</p>
-
-<p><em>Thank you for using nginx.</em></p>
-</body>
-</html>
-Connecting to 10.240.1.14 (10.240.1.14:80)
+Hello from pod: nginx-deployment-68b9c94586-qkwjc
+Connecting to 10.32.0.230 (10.32.0.230:80)
 writing to stdout
--                    100% |********************************|   615  0:00:00 ETA
+-                    100% |********************************|    50  0:00:00 ETA
 written to stdout
 ```
 
-але це не прикольно, хочу звертатись до нджінк деплойменту і щоб воно там само працювало
-знаю що є сервіси - давай через них
+it is not very interesting to access pods by ip, we want to have some automatic load balancing
+we know that services may help us with that
+
 
 ```bash
 {
@@ -128,20 +167,30 @@ kubectl apply -f nginx-service.yml
 }
 ```
 
+get our server
+
 ```bash
 kubectl get service
 ```
 
-такс тепер беремо айпішнік того сервісу (у моєму випадку 10.32.0.95)
-і спробуємо повторити те саме
+and try to ping our containers by service ip
 
 ```bash
-kubectl exec hello-world -- wget -O - 10.32.0.95
+kubectl exec busy-box -- wget -O - $(kubectl get service -o wide | grep nginx | awk '{print $3}')
 ```
 
-і нічого (тут можна згадати ще про ендпоінти і тп, але то може бути просто на довго)
-головна причина чого не працює на даному етапі - у нас не запущений ще 1 важливий компонент
-а саме куб проксі
+Output:
+```
+Connecting to 10.32.0.230 (10.32.0.230:80)
+```
+
+hm, nothing happen, the reason - our cluster do not know how to connect to service ip
+
+this is responsibiltiy of kube-proxy
+
+it means that we need to configure kube-proxy
+
+as usually we will start with certs
 
 ```bash
 {
@@ -174,6 +223,7 @@ cfssl gencert \
 }
 ```
 
+now connection config
 
 ```bash
 {
@@ -198,15 +248,21 @@ cfssl gencert \
 }
 ```
 
+now, download kube-proxy
+
 ```bash
 wget -q --show-progress --https-only --timestamping \
   https://storage.googleapis.com/kubernetes-release/release/v1.21.0/bin/linux/amd64/kube-proxy
 ```
 
+create proper folders
+
 ```bash
 sudo mkdir -p \
   /var/lib/kube-proxy
 ```
+
+install binaries
 
 ```bash
 {
@@ -215,9 +271,13 @@ sudo mkdir -p \
 }
 ```
 
+move connection config to proper folder
+
 ```bash
 sudo mv kube-proxy.kubeconfig /var/lib/kube-proxy/kubeconfig
 ```
+
+create kube-proxy config file
 
 ```bash
 cat <<EOF | sudo tee /var/lib/kube-proxy/kube-proxy-config.yaml
@@ -229,6 +289,8 @@ mode: "iptables"
 clusterCIDR: "10.200.0.0/16"
 EOF
 ```
+
+create kube-proxy service configufile
 
 ```bash
 cat <<EOF | sudo tee /etc/systemd/system/kube-proxy.service
@@ -247,6 +309,8 @@ WantedBy=multi-user.target
 EOF
 ```
 
+start kube-proxy
+
 ```bash
 {
   sudo systemctl daemon-reload
@@ -255,10 +319,13 @@ EOF
 }
 ```
 
+and check its status
+
 ```bash
 sudo systemctl status kube-proxy
 ```
 
+Output:
 ```
 ● kube-proxy.service - Kubernetes Kube Proxy
      Loaded: loaded (/etc/systemd/system/kube-proxy.service; enabled; vendor preset: enabled)
@@ -272,42 +339,22 @@ sudo systemctl status kube-proxy
 ...
 ```
 
-ну що, куб проксі поставили - потрібно провіряти
-
+and now we can check the access to service ip once again
 
 ```bash
-kubectl exec hello-world -- wget -O - 10.32.0.95
+kubectl exec busy-box -- wget -O - $(kubectl get service -o wide | grep nginx | awk '{print $3}')
 ```
 
 ```
-<!DOCTYPE html>
-<html>
-<head>
-<title>Welcome to nginx!</title>
-<style>
-html { color-scheme: light dark; }
-body { width: 35em; margin: 0 auto;
-font-family: Tahoma, Verdana, Arial, sans-serif; }
-</style>
-</head>
-<body>
-<h1>Welcome to nginx!</h1>
-<p>If you see this page, the nginx web server is successfully installed and
-working. Further configuration is required.</p>
-
-<p>For online documentation and support please refer to
-<a href="http://nginx.org/">nginx.org</a>.<br/>
-Commercial support is available at
-<a href="http://nginx.com/">nginx.com</a>.</p>
-
-<p><em>Thank you for using nginx.</em></p>
-</body>
-</html>
-Connecting to 10.32.0.95 (10.32.0.95:80)
+Hello from pod: nginx-deployment-68b9c94586-qkwjc
+Connecting to 10.32.0.230 (10.32.0.230:80)
 writing to stdout
--                    100% |********************************|   615  0:00:00 ETA
+-                    100% |********************************|    50  0:00:00 ETA
 written to stdout
 ```
-ух ти у нас все вийшло
+
+if you try to repeat the command once again you will see that requests are handled by different pods
+
+great we successfully configured kubeproxy and can balance trafic between containers
 
 Next: [DNS in Kubernetes](./10-dns.md)

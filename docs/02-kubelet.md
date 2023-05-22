@@ -1,24 +1,30 @@
 # Kubelet
 
-![image](./img/02_cluster_architecture_kubelet.png "Kubelet")
+In this part of tutorial we will configure (it is better to say that we will partially configure) kubelet on our server.
 
-In this part of tutorial we will configure (let's say partially) configure kubelet on our server.
+But before we will configure kubelet, lets talk a bit about it.
 
 As mentioned in the official kubernetes documentation:
 > An agent that runs on each node in the cluster. It makes sure that containers are running in a Pod.
 > The kubelet takes a set of PodSpecs that are provided through various mechanisms and ensures that the containers described in those PodSpecs are running and healthy.
 
-So, lets set up kubelet and run some pod.
+![image](./img/02_cluster_architecture_kubelet.png "Kubelet")
 
-First of all we need to download kubelet binary
+As we can see, in this section we will work with the next layer of kubernetes components (if I can say so).
+Previously we worked with containers, but on this step we will work with other afteraction kubernetes has - pod.
 
+As you remember at the end, kubernetes usually start pods. So now we will try to create it. But it a bit not usual way, instead of using kubernetes api (which we didn't configured yet), we will create pods with the usage of kubelet only.
+To do that we will use the [static pods](https://kubernetes.io/docs/tasks/configure-pod-container/static-pod/) functionality.
+
+So, lets begin.
+
+First of all we need to download kubelet.
 ```bash
 wget -q --show-progress --https-only --timestamping \
   https://storage.googleapis.com/kubernetes-release/release/v1.21.0/bin/linux/amd64/kubelet
 ```
 
-Make file exacutable and move to the bin folder
-
+After download process complete, muve kubelet binaries to the proper folder
 ```bash
 {
   chmod +x kubelet 
@@ -26,8 +32,7 @@ Make file exacutable and move to the bin folder
 }
 ```
 
-And the last part when configuring kubelet - create service to run kubelet.
-
+As kubelet is a service which is used to manage pods running on the node, we need to configure that service
 ```bash
 cat <<EOF | sudo tee /etc/systemd/system/kubelet.service
 [Unit]
@@ -58,7 +63,7 @@ The main configuration parameters here:
 - --file-check-frequency - how often kubelet will check for the updates of static pods
 - --pod-manifest-path - directory where we will place our pod manifest files
 
-Now, let's start our service
+After our service configured, we can start it
 ```bash
 {
   sudo systemctl daemon-reload
@@ -67,12 +72,12 @@ Now, let's start our service
 }
 ```
 
-And check service status
+To ensure that our service successfully started, run
 ```bash
 sudo systemctl status kubelet
 ```
 
-Output:
+The output should be similar to
 ```
 ● kubelet.service - kubelet: The Kubernetes Node Agent
      Loaded: loaded (/etc/systemd/system/kubelet.service; enabled; vendor preset: enabled)
@@ -87,10 +92,8 @@ Output:
 ```
 
 After kubelet service up and running, we can start creating our pods.
-To do that we will use static pods feature of kubelet.
-> Static Pods are managed directly by the kubelet daemon on a specific node, without the API server observing them. 
 
-Before we will create static pod manifests, we need to create folders where we will place our pods (as we can see from kibelet configuration, it sould be /etc/kubernetes/manifests)
+Before we will create static pod manifests, we need to create folders where we will place our pods (same as we configured in kubelet)
 
 ```bash
 {
@@ -99,8 +102,7 @@ mkdir /etc/kubernetes/manifests
 }
 ```
 
-After directory created, we can create static with busybox inside 
-
+After directory created, we can create static pod with busybox container inside 
 ```bash
 cat <<EOF> /etc/kubernetes/manifests/static-pod.yml
 apiVersion: v1
@@ -118,27 +120,68 @@ spec:
 EOF
 ```
 
-We can check if containerd runned new container
+Now lets use the ctr tool we already know to list the containers created
 ```bash
-ctr tasks ls
+ctr containers ls
 ```
 
 Output:
 ```bash
-TASK    PID    STATUS
+CONTAINER    IMAGE    RUNTIME
 ```
 
 Looks like containerd didn't created any containrs yet? 
-Of course it may be true, but baed on the output of ctr command we can't answer that question. It is not true (of course it may be true, but based on the output of the ctr command we can't confirm that ////more about that here)
+Of course it may be true, but based on the output of ctr command we can't confirm that.
 
-To see containers managed by kubelet lets install [crictl](http://google.com/crictl).
-Download binaries
+Containerd has namespace feature. Namespace is a mechanism used to provide isolation and separation between different sets of resources.
+
+We can check containerd namespaces by running
+```bash
+ctr namespace ls
+```
+
+Output:
+```
+NAME    LABELS
+default
+k8s.io
+```
+
+Containers created by kubelet located in the k8s.io namespace, to see them run
+```bash
+ctr --namespace k8s.io containers ls
+```
+
+Output:
+```
+CONTAINER                                                           IMAGE                                                                      RUNTIME
+33d2725dd9f343de6dd0d4b77161a532ae17d410b266efb31862605453eb54e0    k8s.gcr.io/pause:3.2                                                       io.containerd.runtime.v1.linux
+e75eb4ac89f32ccfb6dc6e894cb6b4429b6dc70eba832bc6dea4dc69b03dec6e    sha256:af2c3e96bcf1a80da1d9b57ec0adc29f73f773a4a115344b7e06aec982157a33    io.containerd.runtime.v1.linux
+```
+
+And to get container status we can call
+```bash
+ctr --namespace k8s.io task ls
+```
+
+Output:
+```
+TASK                                                                PID     STATUS
+e75eb4ac89f32ccfb6dc6e894cb6b4429b6dc70eba832bc6dea4dc69b03dec6e    1524    RUNNING
+33d2725dd9f343de6dd0d4b77161a532ae17d410b266efb31862605453eb54e0    1472    RUNNING
+```
+
+But it is not what we expected, we expected to see container named busybox. Of course there is no majic, all anformation about pod to which this container belongs to, kubernetes containername, etc are located in the metadata on the container, and can be easilly extracted with the usage of other crt command (like this - ctr --namespace k8s.io containers info a597ed1f8dee6a43d398173754fd028c7ac481ee27e09ad4642187ed408814b4). but we want to see it in a bit more readable format, this is why, we will use different tool - [crictl](http://google.com/crictl).
+
+In Comparison to the ctr (which can work with containerd only), crictl is a tool which interracts with any CRI compliant runtime, containerd is only runtime we use in this tutorial. Also, cri ctl provide information in more "kubernetes" way (i mean it can show pods and containers with names like in kubernetes).
+
+So, lets download crictl binaries
 ```bash
 wget -q --show-progress --https-only --timestamping \
   https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.21.0/crictl-v1.21.0-linux-amd64.tar.gz
 ```
 
-Install (move to bin folder)
+After download process complete, move crictl binaries to the proper folder
 ```bash
 {
   tar -xvf crictl-v1.21.0-linux-amd64.tar.gz
@@ -146,7 +189,8 @@ Install (move to bin folder)
   sudo mv crictl /usr/local/bin/
 }
 ```
-And configure a bit
+
+And configure it a bit
 ```bash
 cat <<EOF> /etc/crictl.yaml
 runtime-endpoint: unix:///run/containerd/containerd.sock
@@ -155,6 +199,8 @@ timeout: 10
 debug: false
 EOF
 ```
+
+As already mentioned, crictl can be configured to use any CRI complient runtime, in our case we configured containerd (by providing containerd socket path).
 
 And we can finaly get the list of pods running on our server
 ```bash
@@ -196,7 +242,7 @@ Hello from static pod
 
 Great, now we can run pods on our server.
 
-Before we will continue, remove our pods running
+Now, lets clean up our worspace and continue with the next section
 ```bash
 rm /etc/kubernetes/manifests/static-pod.yml
 ```

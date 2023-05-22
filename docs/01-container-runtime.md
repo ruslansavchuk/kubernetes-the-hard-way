@@ -1,32 +1,30 @@
 # Container runtime
 
-In this part of our tutorial we will focus of the container runtime.
+In this section, we will focus on the container runtime, as it is part of the Kubernetes which is responsible for running containers.
 
 ![image](./img/01_cluster_architecture_container_runtime.png "Container runtime")
 
-Firt of all, container runtime is a tool which can be used by other kubernetes components (kubelet) to manage containers. In case if we have two parts of the system which communicate - we need to have some specification. Nad tehre is the cpecification - CRI.
-
-> The CRI is a plugin interface which enables the kubelet to use a wide variety of container runtimes, without having a need to recompile the cluster components.
-
-In this tutorial we will use [containerd](https://github.com/containerd/containerd) as tool for managing the containers on the node.
-
-On other hand there is a project under the Linux Foundation - OCI. 
-> The OCI is a project under the Linux Foundation is aims to develop open industry standards for container formats and runtimes. The primary goal of OCI is to ensure container portability and interoperability across different platforms and container runtime implementations. The OCI has two main specifications, Runtime Specification (runtime-spec) and Image Specification (image-spec).
-
-In this tutorial we will use [runc](https://github.com/opencontainers/runc) as tool for running containers.
-
-Now, we can start with the configuration.
-
 ## runc
 
-Lets download runc binaries
+First of all, since Kubernetes is an orchestrator for containers, we would like to figure out how to run containers.
+A thing like OCI can help us here.
+
+> The OCI is a project under the Linux Foundation is aims to develop open industry standards for container formats and runtimes. The primary goal of OCI is to ensure container portability and interoperability across different platforms and container runtime implementations. The OCI has two main specifications, Runtime Specification (runtime-spec) and Image Specification (image-spec).
+
+As we can see from the description - OCI is a standard that tells us what is a container image and how to run it.
+
+But it is only a standard, obviously there is some tool that implements this standard. And it is true, runc is a reference implementation of the OCI runtime specification.
+
+So let's install it and run some container with the usage of runc
+
+First of all we need to download runc binaries
 
 ```bash
 wget -q --show-progress --https-only --timestamping \
   https://github.com/opencontainers/runc/releases/download/v1.0.0-rc93/runc.amd64
 ```
 
-As download process complete, we need to move runc binaries to bin folder
+After download process complete, we need to move runc binaries to proper folder
 
 ```bash
 {
@@ -36,7 +34,7 @@ As download process complete, we need to move runc binaries to bin folder
 }
 ```
 
-Now, as we have runc installed, we can run busybox container
+Now, as we have runc configured, we can run busybox container
 
 ```bash
 {
@@ -51,7 +49,7 @@ sed -i 's/"sh"/"echo","Hello from container runned by runc!"/' config.json
 }
 ```
 
-Now, we created all proper files, required by runc to run the container (including container confguration and files which will be accesible from container).
+On this step we downloaded the busybox immage, unarchived it and created proper files, required by runc to run the container (including container confguration and files which will be accesible from container). So, lets run our container
 
 ```bash
 runc run busybox
@@ -62,7 +60,7 @@ Output:
 Hello from container runned by runc!
 ```
 
-Great, everything works, now we need to clean up our workspace
+Great, we create our first container in this tutorial. Now we will clean up our workspace.
 ```bash
 {
 cd ~
@@ -72,16 +70,21 @@ rm -r busybox-container
 
 ## containerd
 
-As already mentioned, Container Runtime: The software responsible for running and managing containers on the worker nodes. The container runtime is responsible for pulling images, creating containers, and managing container lifecycles
+As we can see, runc can run containers, but runc interface is something unknown for kubernetes. 
 
-Now, let's download containerd.
+There is another standert defined which is used by kubelet to communicate with container runtime - CRI
+> The CRI is a plugin interface which enables the kubelet to use a wide variety of container runtimes, without having a need to recompile the cluster components.
+
+In this tutorial we will use [containerd](https://github.com/containerd/containerd) as tool which is compattible with CRI.
+
+To deploy containerd, first of all we need to download it.
 
 ```bash
 wget -q --show-progress --https-only --timestamping \
   https://github.com/containerd/containerd/releases/download/v1.4.4/containerd-1.4.4-linux-amd64.tar.gz
 ```
 
-Unzip containerd binaries to the bin directory
+After download process complete, we need to unzip and move containerd binaries to proper folder
 
 ```bash
 {
@@ -91,9 +94,11 @@ Unzip containerd binaries to the bin directory
 }
 ```
 
-In comparison to the runc, containerd is a service which can be called by someone to run container.
+In comparison to the runc, containerd is a service works like a service which can be called by someone to run container. It means that we need to run it, before we can start comminucate with it.
 
-Before we will run containerd service, we need to configure it.
+We will configure containerd as a service.
+
+To do that, we need to create containerd configuration file
 ```bash
 {
 sudo mkdir -p /etc/containerd/
@@ -112,7 +117,7 @@ EOF
 
 As we can see, we configured containerd to use runc (we installed before) to run containers.
 
-Now we can configure contanerd service
+After configuration file create, we need to create containerd service
 ```bash
 cat <<EOF | sudo tee /etc/systemd/system/containerd.service
 [Unit]
@@ -137,7 +142,7 @@ WantedBy=multi-user.target
 EOF
 ```
 
-Run service
+And now, run it
 ```bash
 {
   sudo systemctl daemon-reload
@@ -146,12 +151,12 @@ Run service
 }
 ```
 
-Ensure if service is in running state
+To ensure that our service successfully started, run
 ```bash
 sudo systemctl status containerd
 ```
 
-We should see the output like this
+The output should be similar to
 ```
 ● containerd.service - containerd container runtime
      Loaded: loaded (/etc/systemd/system/containerd.service; enabled; vendor preset: enabled)
@@ -166,16 +171,16 @@ We should see the output like this
 ...
 ```
 
-As we have running containerd service, we can run some containers.
+Now, we have containerd service running. It means that we can try to create some container.
 
-To do that, we need the tool called [ctr](//todo), it is distributed as part of containerd. 
+To do that, we need the tool called [ctr](https://github.com/projectatomic/containerd/blob/master/docs/cli.md), which is distributed as part of containerd (means that we already installed it during installation of containerd). 
 
-Lets pull busbox image
+First of all we will pull busybox image
 ```bash
 sudo ctr images pull docker.io/library/busybox:latest
 ```
 
-And check if it is presented on our server
+After pull process complete - check our image
 ```bash
 ctr images ls
 ```
@@ -188,17 +193,53 @@ docker.io/library/busybox:latest application/vnd.docker.distribution.manifest.li
 
 Now, lets start our container.
 ```bash
-ctr run --rm --detach docker.io/library/busybox:latest busybox-container sh -c 'echo "Hello from container runned by containerd!"'
+ctr run -t --rm --detach docker.io/library/busybox:latest busybox-container sh -c 'echo "Hello from container runned by containerd!"'
 ```
+
+Our container successfully started, 
 
 Output:
 ```bash
 Hello from container runned by containerd!
 ```
 
-Now, lets clean-up.
+As we can see we successfully started container, now we can check it status
 ```bash
-ctr task rm busybox-container
+ctr containers ls
 ```
+
+Output:
+```
+CONTAINER             IMAGE                               RUNTIME
+busybox-container     docker.io/library/busybox:latest    io.containerd.runc.v2
+``` 
+
+But there is not info about the status, we can see it by reviewing tasks (hope that I will write something about it).
+```bash
+ctr task ls
+```
+
+Output:
+```
+TASK                  PID        STATUS
+busybox-container     2862580    STOPPED
+```
+
+As we can see our container is in stoped state (because command successfully executed and container stopped).
+
+Now, lets clean-up our workspace and go to the next section.
+```bash
+ctr containers rm busybox-container
+```
+
+We can check that list of containers and tasks should be empty
+```bash
+{
+ctr task ls
+ctr containers ls
+}
+``` 
+
+We should receive an empty output
 
 Next: [Kubelet](./02-kubelet.md)

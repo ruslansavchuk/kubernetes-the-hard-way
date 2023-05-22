@@ -1,27 +1,38 @@
 # ETCD
 
-At this point we already know that we can run pods even withour API server. But current aproach os not very confortable to use, to create pod we need to place some manifest in some place. it is not very comfortable to manage. Now we will start our jorney of configuring "real" kubernetes. And of cource all our manifests should be stored somewhere. 
+At this point we already know that we can run pods even withour API server. But current aproach is not very confortable to use, to create pod we need to place some manifest in some place. It is not very comfortable to manage. Now we will start our jorney of configuring "real" (more real than current, because current doesn't look like kubernetes at all) kubernetes. And of course we need to start with the storage.
 
 ![image](./img/04_cluster_architecture_etcd.png "Kubelet")
 
-For kubernetes (at least for original one it I can say so) we need to configura database called ETCD.
+For kubernetes (at least for original one if I can say so) we need to configura database called [etcd](https://etcd.io/).
 
-To configure db (and other kubennetes components in future) we will need some tools to configure certificates.
+>etcd is a strongly consistent, distributed key-value store that provides a reliable way to store data that needs to be accessed by a distributed system or cluster of machines. It gracefully handles leader elections during network partitions and can tolerate machine failure, even in the leader node.
 
+Our etcd will be configured as single node database with authentication (by useage of client cert file).
+
+So, lets start.
+
+As I already said, communication with our etcd cluster will be secured, it means that we need to generate some keys, to encrypt all the trafic.
+To do so, we need to download tools which may help us to generate certificates
+```bash
+wget -q --show-progress --https-only --timestamping \
+  https://github.com/cloudflare/cfssl/releases/download/v1.4.1/cfssl_1.4.1_linux_amd64 \
+  https://github.com/cloudflare/cfssl/releases/download/v1.4.1/cfssljson_1.4.1_linux_amd64
+```
+
+And install 
 ```bash
 {
-    wget -q --show-progress --https-only --timestamping \
-    https://storage.googleapis.com/kubernetes-the-hard-way/cfssl/1.4.1/linux/cfssl \
-    https://storage.googleapis.com/kubernetes-the-hard-way/cfssl/1.4.1/linux/cfssljson
-    chmod +x cfssl cfssljson
-    sudo mv cfssl cfssljson /usr/local/bin/
+mv cfssl_1.4.1_linux_amd64 cfssl
+mv cfssljson_1.4.1_linux_amd64 cfssljson
+chmod +x cfssl cfssljson
+sudo mv cfssl cfssljson /usr/local/bin/
 }
 ```
 
-And now lets begin our etcd configuration journey.
+After the tools installed successfully, we need to generate ca certificate.
 
-First of all we will create ca certificate file.
-
+A ca (Certificate Authority) certificate, also known as a root certificate or a trusted root certificate, is a digital certificate that is used to verify the authenticity of other certificates.
 ```bash
 {
 cat > ca-config.json <<EOF
@@ -70,8 +81,9 @@ ca.csr
 ca.pem
 ```
 
-Now, we need to create certificate which will be used by ETCD (not only ETCD, but about that in next parts) as server cert.
+Now, we can create certificate files signed by our ca file. 
 
+> to simplify our kubernetes deployment, we will use this certificate for other kubernetes components as well, that is why we will add some extra configs (like KUBERNETES_HOST_NAME to it)
 ```bash
 {
 HOST_NAME=$(hostname -a)
@@ -113,14 +125,13 @@ kubernetes-key.pem
 kubernetes.pem
 ```
 
-Now, when we have all required certs, we need to download etcd
-
+Now, we have all required certificates, so, lets download etcd
 ```bash
 wget -q --show-progress --https-only --timestamping \
   "https://github.com/etcd-io/etcd/releases/download/v3.4.15/etcd-v3.4.15-linux-amd64.tar.gz"
 ```
 
-Decompres and install it to the proper folder
+After donload complete, we can move etcd binaries to proper folders
 ```bash
 {
   tar -xvf etcd-v3.4.15-linux-amd64.tar.gz
@@ -128,8 +139,7 @@ Decompres and install it to the proper folder
 }
 ```
 
-When etcd is installed, we need to move our generated certificates to the proper folder 
-
+Now, we can start wioth the configurations of the etcd service. First of all, we need to discribute previuosly generated certificates to the proper folder
 ```bash
 {
   sudo mkdir -p /etc/etcd /var/lib/etcd
@@ -141,7 +151,6 @@ When etcd is installed, we need to move our generated certificates to the proper
 ```
 
 Create etcd service configuration file
-
 ```bash
 cat <<EOF | sudo tee /etc/systemd/system/etcd.service
 [Unit]
@@ -174,25 +183,24 @@ Configuration options specified:
 - key-file - path to the SSL/TLS private key file that corresponds to the SSL/TLS certificate presented by the etcd server during the TLS handshake
 - trusted-ca-file - path to the ca file which will be used by etcd to validate client certificate
 - listen-client-urls - specifies the network addresses on which the etcd server listens for client requests
-- specifies the network addresses that the etcd server advertises to clients for connecting to the server
+- advertise-client-urls - specifies the network addresses that the etcd server advertises to clients for connecting to the server
 - data-dir - directory where etcd stores its data, including the key-value pairs in the etcd key-value store, snapshots, and transaction logs
 
 And finally we need to run our etcd service
-
 ```bash
 {
-  sudo systemctl daemon-reload
-  sudo systemctl enable etcd
-  sudo systemctl start etcd
+sudo systemctl daemon-reload
+sudo systemctl enable etcd
+sudo systemctl start etcd
 }
 ```
 
-And ensure that etcd is up and running
+To ensure that our service successfully started, run
 ```bash
 systemctl status etcd
 ```
 
-Output:
+The output should be similar to
 ```
 ● etcd.service - etcd
      Loaded: loaded (/etc/systemd/system/etcd.service; enabled; vendor preset: enabled)
@@ -206,7 +214,7 @@ Output:
 ...
 ```
 
-When etcd is up and running we can check wheather we can connact to it.
+Now, when etcd is up and running, we can check wheather we can communicate with it
 ```
 sudo ETCDCTL_API=3 etcdctl member list \
   --endpoints=https://127.0.0.1:2379 \
@@ -216,9 +224,10 @@ sudo ETCDCTL_API=3 etcdctl member list \
 ```
 
 Output:
-Результат:
 ```bash
 8e9e05c52164694d, started, etcd, http://localhost:2380, https://127.0.0.1:2379, false
 ```
+
+As you can see, to communicate with our etcd service, we specified cert and key file, this the the same file we used to configure etcd, it is only to simplity our deployment, in real life, we can use different certificate which is signed by the same ca file.
 
 Next: [Api Server](./05-apiserver.md)
