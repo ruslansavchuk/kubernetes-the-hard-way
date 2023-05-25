@@ -1,6 +1,6 @@
 # Controller manager
 
-In this part we will configure controller-manager.
+In this section we will configure controller-manager.
 
 ![image](./img/08_cluster_architecture_controller_manager.png "Kubelet")
 

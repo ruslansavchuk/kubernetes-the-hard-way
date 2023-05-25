@@ -1,9 +1,12 @@
 # Kube-proxy
 
+In this section we will configure kupe-proxy.
+> kube-proxy is a network proxy that runs on each node in your cluster, implementing part of the Kubernetes Service concept.
+> kube-proxy maintains network rules on nodes. These network rules allow network communication to your Pods from network sessions inside or outside of your cluster.
+
 ![image](./img/09_cluster_architecture_proxy.png "Kubelet")
 
-такс, 
-
+Before we will start, lets clarify the reason why do we need it. To do that, we will create deployment with nginx.
 ```bash
 {
 cat <<EOF> nginx-deployment.yml
@@ -65,8 +68,7 @@ nginx-deployment-db9778f94-q5jx4   1/1     Running   0          63s   10.240.1.1
 nginx-deployment-db9778f94-twx78   1/1     Running   0          63s   10.240.1.11   example-server   <none>           <none>
 ```
 
-now, we will run busybox container and will try to access our pods from other container
-
+As you an see, we created 3 pods (each has its own ip address). Now, we will run busybox container and will try to access our pods from other container
 ```bash
 {
 cat <<EOF> pod.yaml
@@ -85,8 +87,7 @@ kubectl apply -f pod.yaml
 }
 ```
 
-and execute command from our container
-
+And execute command from our container
 ```bash
 kubectl exec busy-box -- wget -O - $(kubectl get pod -o wide | grep nginx | awk '{print $6}' | head -n 1)
 ```
@@ -96,8 +97,7 @@ Output:
 error: unable to upgrade connection: Forbidden (user=kubernetes, verb=create, resource=nodes, subresource=proxy)
 ```
 
-error occured because api server has no access to execute commands
-
+This error occured, because api server has no access to execute commands. We will fix this issue, by creating cluster role and assigning it role to kubernetes user. 
 ```bash
 {
 cat <<EOF> rbac-create.yml
@@ -128,8 +128,7 @@ kubectl apply -f rbac-create.yml
 }
 ```
 
-and execute command from our container
-
+Now, we can execute command
 ```bash
 kubectl exec busy-box -- wget -O - $(kubectl get pod -o wide | grep nginx | awk '{print $6}' | head -n 1)
 ```
@@ -143,10 +142,9 @@ writing to stdout
 written to stdout
 ```
 
-it is not very interesting to access pods by ip, we want to have some automatic load balancing
-we know that services may help us with that
+Note: it take some time to apply user permission. During this you can steel see permission error.
 
-
+As you can see, we successfully received the response from the nginx. But to do that we used the IP address of the pod. To solve service discovery issue, kubernetes has special component - service. Now we will create it.
 ```bash
 {
 cat <<EOF> nginx-service.yml
@@ -167,14 +165,12 @@ kubectl apply -f nginx-service.yml
 }
 ```
 
-get our server
-
+Get service created
 ```bash
 kubectl get service
 ```
 
-and try to ping our containers by service ip
-
+Now, we will try to access our pods by using the IP of the service created.
 ```bash
 kubectl exec busy-box -- wget -O - $(kubectl get service -o wide | grep nginx | awk '{print $3}')
 ```
@@ -184,14 +180,14 @@ Output:
 Connecting to 10.32.0.230 (10.32.0.230:80)
 ```
 
-hm, nothing happen, the reason - our cluster do not know how to connect to service ip
+As you can see, we received an error. This error occured because kubernetes know nothing about the IP creted for the service. As already mentioned, kube-proxy is the component responsible to handle requests to ip of the service and redirect that requests to the pods. So, lets configure kube-proxy.
 
-this is responsibiltiy of kube-proxy
+## certificates
 
-it means that we need to configure kube-proxy
+We will start with certificates.
 
-as usually we will start with certs
-
+As you remeber we configured our API server to use client certificate to authenticate user.
+So, lets create proper certificate for the kube-proxy
 ```bash
 {
 cat > kube-proxy-csr.json <<EOF
@@ -219,12 +215,18 @@ cfssl gencert \
   -config=ca-config.json \
   -profile=kubernetes \
   kube-proxy-csr.json | cfssljson -bare kube-proxy
-
 }
 ```
 
-now connection config
+The most interesting configuration options:
+- cn(common name) - value, api server will use as a client name during authorization
+- o(organozation) - user group system:node-proxier will use during authorization
 
+We specified "system:node-proxier" in the organization. It says api server that the client who uses which certificate belongs to the system:node-proxier group.
+
+## configuration
+
+After the certificate files created we can create configuration files for the kube proxy.
 ```bash
 {
   kubectl config set-cluster kubernetes-the-hard-way \
@@ -248,37 +250,33 @@ now connection config
 }
 ```
 
-now, download kube-proxy
+We created kubernetes configuration file, which says kube-proxy where api server is configured and which certificates to use communicating with it
+
+Now, we can distribute created configuration file.
+
+```bash
+{
+sudo mkdir -p /var/lib/kube-proxy
+sudo mv kube-proxy.kubeconfig /var/lib/kube-proxy/kubeconfig
+}
+```
+
+After all required configuration file created, we need to download kube-proxy binaries.
 
 ```bash
 wget -q --show-progress --https-only --timestamping \
   https://storage.googleapis.com/kubernetes-release/release/v1.21.0/bin/linux/amd64/kube-proxy
 ```
 
-create proper folders
-
+And install it
 ```bash
-sudo mkdir -p \
-  /var/lib/kube-proxy
-```
-
-install binaries
-
-```bash
-{
+{    
     chmod +x kube-proxy 
     sudo mv kube-proxy /usr/local/bin/
 }
 ```
 
-move connection config to proper folder
-
-```bash
-sudo mv kube-proxy.kubeconfig /var/lib/kube-proxy/kubeconfig
-```
-
-create kube-proxy config file
-
+Now, we can create configuration file for kube-proxy
 ```bash
 cat <<EOF | sudo tee /var/lib/kube-proxy/kube-proxy-config.yaml
 kind: KubeProxyConfiguration
@@ -290,8 +288,7 @@ clusterCIDR: "10.200.0.0/16"
 EOF
 ```
 
-create kube-proxy service configufile
-
+Service configuration file
 ```bash
 cat <<EOF | sudo tee /etc/systemd/system/kube-proxy.service
 [Unit]
@@ -309,8 +306,7 @@ WantedBy=multi-user.target
 EOF
 ```
 
-start kube-proxy
-
+Start service
 ```bash
 {
   sudo systemctl daemon-reload
@@ -319,8 +315,7 @@ start kube-proxy
 }
 ```
 
-and check its status
-
+And check its status
 ```bash
 sudo systemctl status kube-proxy
 ```
@@ -339,12 +334,14 @@ Output:
 ...
 ```
 
-and now we can check the access to service ip once again
+## verification
 
+After we configured kube-proxy, we can check how or service works once again.
 ```bash
 kubectl exec busy-box -- wget -O - $(kubectl get service -o wide | grep nginx | awk '{print $3}')
 ```
 
+Output:
 ```
 Hello from pod: nginx-deployment-68b9c94586-qkwjc
 Connecting to 10.32.0.230 (10.32.0.230:80)
@@ -353,8 +350,6 @@ writing to stdout
 written to stdout
 ```
 
-if you try to repeat the command once again you will see that requests are handled by different pods
-
-great we successfully configured kubeproxy and can balance trafic between containers
+If you try to repeat the command once again you will see that requests are handled by different pods.
 
 Next: [DNS in Kubernetes](./10-dns.md)
