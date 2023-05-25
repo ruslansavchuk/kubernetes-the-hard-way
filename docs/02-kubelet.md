@@ -1,8 +1,8 @@
 # Kubelet
 
-In this part of tutorial we will configure (it is better to say that we will partially configure) kubelet on our server.
+In this part of the tutorial, we will configure (it is better to say that we will partially configure) kubelet on our server.
 
-But before we will configure kubelet, lets talk a bit about it.
+But before we will configure kubelet, let's talk a bit about it.
 
 As mentioned in the official kubernetes documentation:
 > An agent that runs on each node in the cluster. It makes sure that containers are running in a Pod.
@@ -11,20 +11,20 @@ As mentioned in the official kubernetes documentation:
 ![image](./img/02_cluster_architecture_kubelet.png "Kubelet")
 
 As we can see, in this section we will work with the next layer of kubernetes components (if I can say so).
-Previously we worked with containers, but on this step we will work with other afteraction kubernetes has - pod.
+Previously we worked with containers, but on this step, we will work with other abstraction kubernetes has - pod.
 
-As you remember at the end, kubernetes usually start pods. So now we will try to create it. But it a bit not usual way, instead of using kubernetes api (which we didn't configured yet), we will create pods with the usage of kubelet only.
+As you remember at the end, kubernetes usually start pods. So now we will try to create it. But it is a bit not the usual way, instead of using kubernetes api (which we didn't configure yet), we will create pods with the usage of kubelet only.
 To do that we will use the [static pods](https://kubernetes.io/docs/tasks/configure-pod-container/static-pod/) functionality.
 
-So, lets begin.
+So, let's begin.
 
-First of all we need to download kubelet.
+First of all, we need to download kubelet.
 ```bash
 wget -q --show-progress --https-only --timestamping \
   https://storage.googleapis.com/kubernetes-release/release/v1.21.0/bin/linux/amd64/kubelet
 ```
 
-After download process complete, muve kubelet binaries to the proper folder
+After download process complete, move kubelet binaries to the proper folder
 ```bash
 {
   chmod +x kubelet 
@@ -32,7 +32,7 @@ After download process complete, muve kubelet binaries to the proper folder
 }
 ```
 
-As kubelet is a service which is used to manage pods running on the node, we need to configure that service
+As kubelet is a service that is used to manage pods running on the node, we need to configure that service
 ```bash
 cat <<EOF | sudo tee /etc/systemd/system/kubelet.service
 [Unit]
@@ -59,11 +59,11 @@ EOF
 ```
 
 The main configuration parameters here:
-- --container-runtime-endpoint - linux soket on which containerd listed for the requests
+- --container-runtime-endpoint - linux socket on which containerd listed for the requests
 - --file-check-frequency - how often kubelet will check for the updates of static pods
 - --pod-manifest-path - directory where we will place our pod manifest files
 
-After our service configured, we can start it
+After our service is configured, we can start it
 ```bash
 {
   sudo systemctl daemon-reload
@@ -77,7 +77,7 @@ To ensure that our service successfully started, run
 sudo systemctl status kubelet
 ```
 
-The output should be similar to
+Output:
 ```
 ● kubelet.service - kubelet: The Kubernetes Node Agent
      Loaded: loaded (/etc/systemd/system/kubelet.service; enabled; vendor preset: enabled)
@@ -91,7 +91,7 @@ The output should be similar to
 ...
 ```
 
-After kubelet service up and running, we can start creating our pods.
+After kubelet service is up and running, we can start creating our pods.
 
 Before we will create static pod manifests, we need to create folders where we will place our pods (same as we configured in kubelet)
 
@@ -102,7 +102,7 @@ mkdir /etc/kubernetes/manifests
 }
 ```
 
-After directory created, we can create static pod with busybox container inside 
+After the directory is created, we can create a static pod with busybox container inside 
 ```bash
 cat <<EOF> /etc/kubernetes/manifests/static-pod.yml
 apiVersion: v1
@@ -120,7 +120,7 @@ spec:
 EOF
 ```
 
-Now lets use the ctr tool we already know to list the containers created
+Now, let's use the ctr tool we already know to list the containers created
 ```bash
 ctr containers ls
 ```
@@ -130,10 +130,10 @@ Output:
 CONTAINER    IMAGE    RUNTIME
 ```
 
-Looks like containerd didn't created any containrs yet? 
-Of course it may be true, but based on the output of ctr command we can't confirm that.
+Looks like containerd didn't create any containers yet.
+Of course, it may be true, but based on the output of ctr command we can't confirm that.
 
-Containerd has namespace feature. Namespace is a mechanism used to provide isolation and separation between different sets of resources.
+Containerd has a namespace feature. Namespace is a mechanism used to provide isolation and separation between different sets of resources.
 
 We can check containerd namespaces by running
 ```bash
@@ -171,17 +171,17 @@ e75eb4ac89f32ccfb6dc6e894cb6b4429b6dc70eba832bc6dea4dc69b03dec6e    1524    RUNN
 33d2725dd9f343de6dd0d4b77161a532ae17d410b266efb31862605453eb54e0    1472    RUNNING
 ```
 
-But it is not what we expected, we expected to see container named busybox. Of course there is no majic, all anformation about pod to which this container belongs to, kubernetes containername, etc are located in the metadata on the container, and can be easilly extracted with the usage of other crt command (like this - ctr --namespace k8s.io containers info a597ed1f8dee6a43d398173754fd028c7ac481ee27e09ad4642187ed408814b4). but we want to see it in a bit more readable format, this is why, we will use different tool - [crictl](http://google.com/crictl).
+But it is not what we expected, we expected to see a container named busybox. Of course, there is no magic, all information about the pod to which this container belongs, kubernetes container name, etc are located in the metadata on the container, and can be easily extracted with the usage of other crt commands (like this - ctr --namespace k8s.io containers info a597ed1f8dee6a43d398173754fd028c7ac481ee27e09ad4642187ed408814b4). but we want to see it in a bit more readable format, this is why, we will use a different tool - [crictl](http://google.com/crictl).
 
-In Comparison to the ctr (which can work with containerd only), crictl is a tool which interracts with any CRI compliant runtime, containerd is only runtime we use in this tutorial. Also, cri ctl provide information in more "kubernetes" way (i mean it can show pods and containers with names like in kubernetes).
+In comparison to the ctr (which can work with containerd only), crictl is a tool that interacts with any CRI-compliant runtime, containerd is the runtime we use in this tutorial. Also, crictl provides information in more "kubernetes" way (I mean it can show pods and containers with names like in kubernetes).
 
-So, lets download crictl binaries
+So, let's download crictl binaries
 ```bash
 wget -q --show-progress --https-only --timestamping \
   https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.21.0/crictl-v1.21.0-linux-amd64.tar.gz
 ```
 
-After download process complete, move crictl binaries to the proper folder
+After the download process is complete, move crictl binaries to the proper folder
 ```bash
 {
   tar -xvf crictl-v1.21.0-linux-amd64.tar.gz
@@ -200,9 +200,9 @@ debug: false
 EOF
 ```
 
-As already mentioned, crictl can be configured to use any CRI complient runtime, in our case we configured containerd (by providing containerd socket path).
+As already mentioned, crictl can be configured to use any CRI-compliant runtime, in our case we configured containerd (by providing containerd socket path).
 
-And we can finaly get the list of pods running on our server
+And finally, we can get the list of pods running on our server.
 ```bash
 crictl pods
 ```
@@ -226,8 +226,8 @@ CONTAINER           IMAGE               CREATED             STATE               
 912487fb63f9e       7cfbbec8963d8       10 minutes ago      Running             busybox             0                   16595e954ab3e
 ```
 
-Looks like our container is in running state.
-Lets check its logs.
+Looks like our container is in a running state.
+Let's check its logs.
 ```bash
 crictl logs $(crictl ps -q)
 ```
@@ -242,12 +242,12 @@ Hello from static pod
 
 Great, now we can run pods on our server.
 
-Now, lets clean up our worspace and continue with the next section
+Now, let's clean up our workspace and continue with the next section
 ```bash
 rm /etc/kubernetes/manifests/static-pod.yml
 ```
 
-It takes some time to remove the pods, we can ensure that pod are deleted by running 
+It takes some time to remove the pods, we can ensure that pods are deleted by running
 ```bash
 {
 crictl pods
@@ -255,6 +255,6 @@ crictl ps
 }
 ```
 
-The output shuld be empty.
+The output should be empty.
 
 Next: [Pod networking](./03-pod-networking.md)

@@ -1,6 +1,6 @@
 # Container runtime
 
-In this section, we will focus on the container runtime, as it is part of the Kubernetes which is responsible for running containers.
+In this section, we will focus on the container runtime.
 
 ![image](./img/01_cluster_architecture_container_runtime.png "Container runtime")
 
@@ -13,7 +13,7 @@ A thing like OCI can help us here.
 
 As we can see from the description - OCI is a standard that tells us what is a container image and how to run it.
 
-But it is only a standard, obviously there is some tool that implements this standard. And it is true, runc is a reference implementation of the OCI runtime specification.
+But it is only a standard, obviously, there is some tool that implements this standard. And it is true, runc is a reference implementation of the OCI runtime specification.
 
 So let's install it and run some container with the usage of runc
 
@@ -24,7 +24,7 @@ wget -q --show-progress --https-only --timestamping \
   https://github.com/opencontainers/runc/releases/download/v1.0.0-rc93/runc.amd64
 ```
 
-After download process complete, we need to move runc binaries to proper folder
+After the download process is complete, we need to move runc binaries to proper folder
 
 ```bash
 {
@@ -49,7 +49,7 @@ sed -i 's/"sh"/"echo","Hello from container runned by runc!"/' config.json
 }
 ```
 
-On this step we downloaded the busybox immage, unarchived it and created proper files, required by runc to run the container (including container confguration and files which will be accesible from container). So, lets run our container
+In this step, we downloaded the busybox image, unarchived it, and created the proper files, required by runc to run the container (including container configuration and files that will be accessible from the container). So, let's run our container
 
 ```bash
 runc run busybox
@@ -60,7 +60,7 @@ Output:
 Hello from container runned by runc!
 ```
 
-Great, we create our first container in this tutorial. Now we will clean up our workspace.
+Great, we created our first container in this tutorial. Now we will clean up our workspace.
 ```bash
 {
 cd ~
@@ -72,12 +72,12 @@ rm -r busybox-container
 
 As we can see, runc can run containers, but runc interface is something unknown for kubernetes. 
 
-There is another standert defined which is used by kubelet to communicate with container runtime - CRI
+There is another standard defined which is used by kubelet to communicate with container runtime - CRI
 > The CRI is a plugin interface which enables the kubelet to use a wide variety of container runtimes, without having a need to recompile the cluster components.
 
-In this tutorial we will use [containerd](https://github.com/containerd/containerd) as tool which is compattible with CRI.
+In this tutorial, we will use [containerd](https://github.com/containerd/containerd) as a tool which is compattible with CRI.
 
-To deploy containerd, first of all we need to download it.
+To deploy containerd, first of all, we need to download it.
 
 ```bash
 wget -q --show-progress --https-only --timestamping \
@@ -94,7 +94,7 @@ After download process complete, we need to unzip and move containerd binaries t
 }
 ```
 
-In comparison to the runc, containerd is a service works like a service which can be called by someone to run container. It means that we need to run it, before we can start comminucate with it.
+In comparison to the runc, containerd is a service that works like a service that can be called by someone to run a container. It means that we need to run it before we can start communicating with it.
 
 We will configure containerd as a service.
 
@@ -156,7 +156,7 @@ To ensure that our service successfully started, run
 sudo systemctl status containerd
 ```
 
-The output should be similar to
+Output:
 ```
 ● containerd.service - containerd container runtime
      Loaded: loaded (/etc/systemd/system/containerd.service; enabled; vendor preset: enabled)
@@ -173,14 +173,14 @@ The output should be similar to
 
 Now, we have containerd service running. It means that we can try to create some container.
 
-To do that, we need the tool called [ctr](https://github.com/projectatomic/containerd/blob/master/docs/cli.md), which is distributed as part of containerd (means that we already installed it during installation of containerd). 
+To do that, we need the tool called [ctr](https://github.com/projectatomic/containerd/blob/master/docs/cli.md), which is distributed as part of containerd (which means that we already installed it during the installation of containerd).
 
-First of all we will pull busybox image
+First of all, we will pull busybox image
 ```bash
 sudo ctr images pull docker.io/library/busybox:latest
 ```
 
-After pull process complete - check our image
+After the pull process is complete - check our image
 ```bash
 ctr images ls
 ```
@@ -191,19 +191,17 @@ REF                              TYPE                                           
 docker.io/library/busybox:latest application/vnd.docker.distribution.manifest.list.v2+json sha256:b5d6fe0712636ceb7430189de28819e195e8966372edfc2d9409d79402a0dc16 2.5 MiB linux/386,linux/amd64,linux/arm/v5,linux/arm/v6,linux/arm/v7,linux/arm64/v8,linux/mips64le,linux/ppc64le,linux/riscv64,linux/s390x -
 ```
 
-Now, lets start our container.
+Now, let's start our container
 ```bash
 ctr run -t --rm --detach docker.io/library/busybox:latest busybox-container sh -c 'echo "Hello from container runned by containerd!"'
 ```
-
-Our container successfully started, 
 
 Output:
 ```bash
 Hello from container runned by containerd!
 ```
 
-As we can see we successfully started container, now we can check it status
+As we can see we successfully started the container, now we can check its status
 ```bash
 ctr containers ls
 ```
@@ -214,7 +212,7 @@ CONTAINER             IMAGE                               RUNTIME
 busybox-container     docker.io/library/busybox:latest    io.containerd.runc.v2
 ``` 
 
-But there is not info about the status, we can see it by reviewing tasks (hope that I will write something about it).
+But there is no info about the status, we can see it by reviewing tasks
 ```bash
 ctr task ls
 ```
@@ -225,9 +223,9 @@ TASK                  PID        STATUS
 busybox-container     2862580    STOPPED
 ```
 
-As we can see our container is in stoped state (because command successfully executed and container stopped).
+As we can see our container is in the stopped state (because the command was successfully executed and the container stopped).
 
-Now, lets clean-up our workspace and go to the next section.
+Now, let's clean up our workspace and go to the next section.
 ```bash
 ctr containers rm busybox-container
 ```
