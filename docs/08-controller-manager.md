@@ -237,4 +237,14 @@ Now, when our controller manager configured, lets clean up our workspace.
 kubectl delete -f deployment.yaml
 ```
 
+Check if pod created by deployment deleted
+```bash
+kubectl get pod
+```
+
+Outpput:
+```
+No resources found in default namespace.
+```
+
 Next: [Kube-proxy](./09-kubeproxy.md)

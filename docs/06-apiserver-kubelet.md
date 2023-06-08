@@ -98,7 +98,7 @@ And now, move all our configuration settings to the proper folders
 sudo cp kubelet.kubeconfig /var/lib/kubelet/kubeconfig
 ```
 
-Alsom we need to create KubeletConfiguration
+Also, we need to create KubeletConfiguration
 ```bash
 cat <<EOF | sudo tee /var/lib/kubelet/kubelet-config.yaml
 kind: KubeletConfiguration
@@ -291,7 +291,9 @@ Hello, World!
 ...
 ```
 
-As you can see, we can create pods and kubelet will run that pods. 
+As you can see, we can create pods and kubelet will run that pods.
+
+Note: it takes some time to apply created RBAC policies.
 
 Now, we need to clean-up out workspace.
 ```bash
@@ -308,5 +310,4 @@ Outpput:
 No resources found in default namespace.
 ```
 
-Next: [Scheduler](./07-controller-manager.md)
-Next: [Controller manager](./07-controller-manager.md)
+Next: [Scheduler](./07-scheduler.md)

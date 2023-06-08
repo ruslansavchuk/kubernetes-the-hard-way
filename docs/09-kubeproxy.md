@@ -142,6 +142,8 @@ writing to stdout
 written to stdout
 ```
 
+Note: usually, it takes some time to apply all RBAC policies
+
 Note: it take some time to apply user permission. During this you can steel see permission error.
 
 As you can see, we successfully received the response from the nginx. But to do that we used the IP address of the pod. To solve service discovery issue, kubernetes has special component - service. Now we will create it.
@@ -256,8 +258,8 @@ Now, we can distribute created configuration file.
 
 ```bash
 {
-sudo mkdir -p /var/lib/kube-proxy
-sudo mv kube-proxy.kubeconfig /var/lib/kube-proxy/kubeconfig
+  sudo mkdir -p /var/lib/kube-proxy
+  sudo mv kube-proxy.kubeconfig /var/lib/kube-proxy/kubeconfig
 }
 ```
 
@@ -271,8 +273,8 @@ wget -q --show-progress --https-only --timestamping \
 And install it
 ```bash
 {    
-    chmod +x kube-proxy 
-    sudo mv kube-proxy /usr/local/bin/
+  chmod +x kube-proxy 
+  sudo mv kube-proxy /usr/local/bin/
 }
 ```
 

@@ -1,16 +1,16 @@
 # Api Server
 
-In this section we will configure kubernetes API server.
+In this section, we will configure kubernetes API server.
+
 > The Kubernetes API server validates and configures data for the api objects which include pods, services, replicationcontrollers, and others. The API Server services REST operations and provides the frontend to the cluster's shared state through which all other components interact.
 
-As you can see from the description adpi server is central (not main) component of kubernetes cluster.
+As you can see from the description, api server is a central (not the main) component of kubernetes cluster.
 
 ![image](./img/05_cluster_architecture_apiserver.png "Kubelet")
 
 ## certificates
 
-Before we begin with configuration of API server, we need to create certificates for kubernetes that will be used to sign service account tokens.
-
+Before we begin with the configuration of the api server, we need to create certificates for kubernetes that will be used to sign service account tokens.
 ```bash
 {
 cat > service-account-csr.json <<EOF
@@ -41,27 +41,27 @@ cfssl gencert \
 }
 ```
 
-Now, we need to distbibute certificates to the api server configuration folder
+Now, we need to distribute certificates to the api server configuration folder
 ```bash
 {
-mkdir /var/lib/kubernetes/
-sudo cp \
-  ca.pem \
-  kubernetes.pem kubernetes-key.pem \
-  service-account-key.pem service-account.pem \
-  /var/lib/kubernetes/
+  mkdir /var/lib/kubernetes/
+  sudo cp \
+    ca.pem \
+    kubernetes.pem kubernetes-key.pem \
+    service-account-key.pem service-account.pem \
+    /var/lib/kubernetes/
 }
 ```
 
-As you can see, in addition to the generated service-account certificate file, we also distributed certificate generated in [previous](./04-etcd.md) section. We will use that certificate for communication between 
+As you can see, in addition to the generated service-account certificate file, we also distributed the certificate generated in the [previous](./04-etcd.md) section. We will use that certificate for communication between 
 - api server and etcd
 - as certificate when comunication with api server
 
-Also, we will use ca file to validate certificate files of the other components wo comminucate with api server.
+Also, we will use the ca file to validate the certificate files of the other components that communicate with the api server.
 
 ## data encryption
 
-Also, we will configure api server to encrypt data sensitive before saving it to the etcd database. To do that we need to create encryption config file.
+Also, we will configure the api server to encrypt sensitive data (secrets) before saving it to the etcd database. To do that we need to create the encryption config file.
 ```bash
 {
 ENCRYPTION_KEY=$(head -c 32 /dev/urandom | base64)
@@ -81,24 +81,24 @@ resources:
 EOF
 }
 ```
-This config days kubernetes to encrypt secrets when storing it in etcd with the usage of aescbc encryption provider.
+This config says api server to encrypt secrets before storing them in the etcd (with the usage of aescbc encryption provider).
 
 ## service configuration
 
-Now, when all required configuration/certificate files created and distributed to the proper folders, we can downlad binaries and enable api server as service.
+Now, when all required configuration/certificate files are created and distributed to the proper folders, we can download binaries and enable api server as a service.
 
-First of all we need to download and install api server binaries
+First of all, we need to download and install api server binaries
 
 ```bash
 {
-wget -q --show-progress --https-only --timestamping \
-  "https://storage.googleapis.com/kubernetes-release/release/v1.21.0/bin/linux/amd64/kube-apiserver"
-  chmod +x kube-apiserver
+  wget -q --show-progress --https-only --timestamping \
+    "https://storage.googleapis.com/kubernetes-release/release/v1.21.0/bin/linux/amd64/kube-apiserver"
+    chmod +x kube-apiserver
   sudo mv kube-apiserver /usr/local/bin/
 }
 ```
 
-And create service configuration file
+And create the service configuration file
 
 ```bash
 cat <<EOF | sudo tee /etc/systemd/system/kube-apiserver.service
@@ -150,14 +150,13 @@ Configuration options I want to highlight:
 Now, when api-server service is configured, we can start it
 ```bash
 {
-sudo systemctl daemon-reload
-sudo systemctl enable kube-apiserver
-sudo systemctl start kube-apiserver
+  sudo systemctl daemon-reload
+  sudo systemctl enable kube-apiserver
+  sudo systemctl start kube-apiserver
 }
 ```
 
-And check service status
-
+And check the service status
 ```bash
 sudo systemctl status kube-apiserver
 ```
@@ -176,9 +175,8 @@ Output:
 ...
 ```
 
-## communication with api server
-
-Now, when our server is up and running, we want to communicate with it. To do that we will use cubectl tool. So lets download and install it
+## verify
+Now, when our server is up and running, we want to communicate with it. To do that we will use kubectl tool. So let's download and install it
 
 ```bash
 wget -q --show-progress --https-only --timestamping \
@@ -187,8 +185,7 @@ wget -q --show-progress --https-only --timestamping \
   && sudo mv kubectl /usr/local/bin/
 ```
 
-As our server is configured to use RBAC authorization, we need to authirize to our server in somehow. To do that, we will generate certificate file which will be signed by ca cert, and have "admin" CN property.
-
+As the api server is configured in more or less secure mode, we need to provide some credentials when accessing it. We will use certificate files as the credentials. That is why we need to generate a proper certificate file that will allow us to access api server with administrator privileges
 ```bash
 {
 cat > admin-csr.json <<EOF
@@ -219,7 +216,7 @@ cfssl gencert \
 }
 ```
 
-Now, when our certificate file generated, we can use it in kubectl. To do that we will update default kubectl config file (actually we will create it) to use the proper certs and connection options.
+Now, when our certificate file is generated, we can use it in kubectl. To do that we will update the default kubectl config file (actually we will create it) to use the proper certs and connection options.
 ```bash
 {
 kubectl config set-cluster kubernetes-the-hard-way \
@@ -240,8 +237,7 @@ kubectl config use-context default
 }
 ```
 
-Now, we should be able to receive our cluster and kubeclt info
-
+Now, we should be able to receive the cluster and kubeclt info
 ```bash
 kubectl version
 ```
@@ -252,8 +248,8 @@ Client Version: version.Info{Major:"1", Minor:"21", GitVersion:"v1.21.0", GitCom
 Server Version: version.Info{Major:"1", Minor:"21", GitVersion:"v1.21.0", GitCommit:"cb303e613a121a29364f75cc67d3d580833a7479", GitTreeState:"clean", BuildDate:"2021-04-08T16:25:06Z", GoVersion:"go1.16.1", Compiler:"gc", Platform:"linux/amd64"}
 ```
 
-As I already mentioned, api-server is central kubernetes component, which stores information about all kubernetes objects, it means that we can create pod, even when other components (kubelet, scheduler, controller manager) not configured
-
+As already mentioned, api-server is the central kubernetes component, that stores information about all kubernetes objects.
+It means that we can create a pod, even when other components (kubelet, scheduler, controller manager) are not configured
 ```bash
 {
 HOST_NAME=$(hostname -a)
@@ -285,7 +281,7 @@ kubectl apply -f pod.yaml
 }
 ```
 
-Note: as you can see, in addition to the pod, we create service account associated with our pod. This step is needed as we have now default service account created in default namespace (service account controller is responsible to create it, but we didn't configure controller manager yet).
+Note: as you can see, in addition to the pod, we create the service account associated with the pod. This step is needed as we have no default service account created in the default namespace (the service account controller is responsible to create it, but we didn't configure the controller manager yet).
 
 To check pod status run
 ```bash
@@ -298,9 +294,9 @@ NAME          READY   STATUS    RESTARTS   AGE
 hello-world   0/1     Pending   0          29s
 ```
 
-As expected we received pod in pending state, because we have now kubelet configured to run pods created in API server.
+As expected we received the pod in a pending state, because we have now kubelet configured to run pods created in API server.
 
-To ensure we can check it
+We can veryfy that by running
 ```bash
 kubectl get nodes
 ```

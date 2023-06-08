@@ -4,7 +4,7 @@ Now, we know how kubelet runs containers and we know how to run pod without othe
 
 Let's experiment with static pod a bit.
 
-We will create static pod, but this time we will run nginx, instead of busybox
+We will create a static pod, but this time we will run nginx, instead of busybox
 ```bash
 cat <<EOF> /etc/kubernetes/manifests/static-nginx.yml
 apiVersion: v1
@@ -21,7 +21,7 @@ spec:
 EOF
 ```
 
-After manifest created we can check wheather our nginx container is created
+After the manifest is created we can check whether our nginx container is created
 
 ```bash
 crictl pods
@@ -33,8 +33,8 @@ POD ID              CREATED              STATE               NAME               
 14662195d6829       About a minute ago   Ready               static-nginx-example-server   default             0                   (default)
 ```
 
-As we can see out nginx container is up and running.
-Let's check wheather it works as expected.
+As we can see our nginx container is up and running.
+Let's check whether it works as expected.
 
 ```bash
 curl localhost
@@ -67,7 +67,7 @@ Commercial support is available at
 </html>
 ```
 
-Now, lets try to create 1 more nginx container.
+Now, let's try to create 1 more Nginx container.
 ```bash
 cat <<EOF> /etc/kubernetes/manifests/static-nginx-2.yml
 apiVersion: v1
@@ -84,7 +84,7 @@ spec:
 EOF
 ```
 
-Again will try to check if our pod is in running state.
+Again will try to check if our pod is in a running state
 
 ```bash
 crictl pods
@@ -97,13 +97,13 @@ a299a86893e28       40 seconds ago      Ready               static-nginx-2-examp
 14662195d6829       4 minutes ago       Ready               static-nginx-example-server     default             0                   (default)
 ```
 
-Looks like out pod is up, but if we will try to check the underlying containers we may be surprised.
-
+Looks like our pod is up, but if we will try to check the underlying containers we may be surprised.
 
 ```bash
 crictl ps -a
 ```
 
+Output:
 ```
 CONTAINER           IMAGE               CREATED             STATE               NAME                ATTEMPT             POD ID
 9e8cb98b87aed       6efc10a0510f1       42 seconds ago      Exited              nginx               3                   b013eca0e9d33
@@ -111,13 +111,13 @@ CONTAINER           IMAGE               CREATED             STATE               
 ```
 
 As you can see our second container is in exit state.
-To check the reason of the Exit state we can review container logs
+To check the reason for the exit state we can review the container logs
 
 ```bash
 crictl logs $(crictl ps -q -s Exited)
 ```
 
-In the logs, you shoud see something like this
+Output:
 ```
 ...
 2023/04/18 20:49:47 [emerg] 1#1: bind() to 0.0.0.0:80 failed (98: Address already in use)
@@ -125,11 +125,10 @@ nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)
 ...
 ```
 
-As we can see, the reason of the exit state - adress already in use.
-Our address already in use by our other container.
+As we can see, the reason for the exit state - the address is already in use.
+The Nginx container tries to use the port that is already in use by another (first) Nginx other container.
 
-We received this error because we run two pods which require an access to the same port on our server.
-This was done by specifying  
+We received this error because we run two Nginx applications that use the same host. That was done by specifying
 ```
 ...
 spec:
@@ -137,9 +136,9 @@ spec:
 ...
 ```
 
-This option runs our container on our host without any network isolation (almost the same as running two nginx without on the same host without containers)
+This option says kubelet that containers created should be run on the host without any network isolation (almost the same as running two nginx on the same host without containers)
 
-Now we will try to update our pod manifests to run our containers in separate network "namespaces"
+Now we will try to update our pod manifests to run containers in separate network namespaces
 ```bash
 {
 cat <<EOF> /etc/kubernetes/manifests/static-nginx.yml
@@ -170,9 +169,9 @@ EOF
 }
 ```
 
-As you can see we simply removed hostNetwork: true configuration option.
+As you can see we removed the "hostNetwork: true" configuration option.
 
-So, lets check what we have
+So, let's check what we have
 ```bash
 crictl pods
 ```
@@ -182,8 +181,8 @@ Output:
 POD ID              CREATED             STATE               NAME                NAMESPACE           ATTEMPT             RUNTIME
 ```
 
-Very strange, we see nothing.
-To define the reason why no pods created lets review the kubelet logs (but as we know what we are looking for, we will chit a bit)
+We see nothing.
+To define the reason why no pods were created let's review the logs
 ```bash
 journalctl -u kubelet | grep NetworkNotReady
 ```
@@ -195,25 +194,24 @@ May 03 13:43:43 example-server kubelet[23701]: I0503 13:43:43.862719   23701 eve
 ...
 ```
 
-As we can see cni plugin is not initialized. But what is cni plugin.
+As we can see cni plugin is not initialized. But what is cni plugin?
 
 > CNI stands for Container Networking Interface. It is a standard for defining how network connectivity is established and managed between containers, as well as between containers and the host system in a container runtime environment. Kubernetes uses CNI plugins to implement networking for pods.
 
 > A CNI plugin is a binary executable that is responsible for configuring the network interfaces and routes of a container or pod. It communicates with the container runtime (such as Docker or CRI-O) to set up networking for the container or pod.
 
-As we can see kubelet can't configure network for pod by himself (or with the help of containerd). Same as with containers, to configure network kubelet use some 'protocol' to communicate with 'someone' who can configure networ.
+As we can see kubelet can't configure the network for a pod by himself (or with the help of containerd). Same as with containers, to configure a network kubelet uses some 'protocol' to communicate with 'someone' who can configure a network.
 
-Now, we will configure the cni plugin for our kubelet.
+Now, we will configure the cni plugin.
 
-First of all we need to download that plugin
+First of all, we need to download that plugin
 
 ```bash
 wget -q --show-progress --https-only --timestamping \
   https://github.com/containernetworking/plugins/releases/download/v0.9.1/cni-plugins-linux-amd64-v0.9.1.tgz
 ```
 
-Now, we will create proper folders structure for our plugin
-
+Now, we will create proper folders structure
 ```bash
 sudo mkdir -p \
   /etc/cni/net.d \
@@ -221,17 +219,16 @@ sudo mkdir -p \
 ```
 
 here:
-- net.d - folder where we will store our plugin configuration files
+- net.d - folder where plugin configuration files stored
 - bin - folder for plugin binaries
 
-Now, we will untar our plugin to proper folder
+Now, we will untar the plugin to the proper folder
 
 ```bash
 sudo tar -xvf cni-plugins-linux-amd64-v0.9.1.tgz -C /opt/cni/bin/
 ```
 
 And create plugin configuration
-
 ```bash
 {
 cat <<EOF | sudo tee /etc/cni/net.d/10-bridge.conf
@@ -262,11 +259,11 @@ EOF
 }
 ```
 
-Of course all configuration options here important, but I want to highlight 2 of them:
-- ranges - information about subnets from shich ip addresses will be assigned for our pods
-- routes - information on how to route trafic between nodes, as we have single node kubernetes cluster the configuration is very easy
+Of course, all configuration options here are important, but I want to highlight 2 of them:
+- ranges - information about subnets from which IP addresses will be assigned for pods
+- routes - information on how to route traffic between nodes. As we have single node kubernetes cluster the configuration is very easy
 
-Update our kubelet config (add network-plugin configuration option)
+Update the kubelet config (add network-plugin configuration option)
 ```bash
 cat <<EOF | sudo tee /etc/systemd/system/kubelet.service
 [Unit]
@@ -293,7 +290,7 @@ WantedBy=multi-user.target
 EOF
 ```
 
-After kubelet reconfigured, we can restart it
+After the kubelet is reconfigured, we can restart it
 ```bash
 {
   sudo systemctl daemon-reload
@@ -319,7 +316,7 @@ Output:
              └─86730 /usr/local/bin/kubelet --container-runtime=remote --container-runtime-endpoint=unix:///var/run/containerd/containerd.sock --image-pull-progress-deadline=2m --file-che>
 ```
 
-Now, after all fixes applyed and we have working kubelet, we can check wheather our pods created
+Now, after all fixes applied and we have a working kubelet, we can check whether the pods created
 ```bash
 crictl pods
 ```
@@ -332,7 +329,6 @@ b9c684fa20082       2 minutes ago       Ready               static-nginx-example
 ```
 
 Pods are ok, but what about containers
-
 ```bash
 crictl ps
 ```
@@ -346,15 +342,15 @@ CONTAINER           IMAGE               CREATED             STATE               
 
 They are also in running state
 
-On this step if we will try to curl localhost nothing will happen.
-Our pods are runned in separate network namespaces, and each pod has its own ip address.
+In this step, if we will try to curl localhost, nothing will happen.
+Our pods are run in separate network namespaces, and each pod has its own IP address.
 We need to define it.
 
 ```bash
 {
-PID=$(crictl pods --label app=static-nginx-2 -q)
-CID=$(crictl ps -q --pod $PID)
-crictl exec $CID ip a
+  PID=$(crictl pods --label app=static-nginx-2 -q)
+  CID=$(crictl ps -q --pod $PID)
+  crictl exec $CID ip a
 }
 ```
 
@@ -370,15 +366,15 @@ Output:
 ...
 ```
 
-During the plugin configuration we remember that we configure the subnet pod our pods to be 10.240.1.0/24. So, the container received its IP from the range specified, in my case it was 10.240.1.1.
+During plugin configuration, we remember that we configure the pod's subnet to 10.240.1.0/24. So, the container received its IP from the range specified, in my case, it was 10.240.1.1.
 
-So, lets try to curl our container.
+So, let's try to curl the container.
 ```bash
 {
-PID=$(crictl pods --label app=static-nginx-2 -q)
-CID=$(crictl ps -q --pod $PID)
-IP=$(crictl exec $CID ip a | grep 240 | awk '{print $2}' | cut -f1 -d'/')
-curl $IP
+  PID=$(crictl pods --label app=static-nginx-2 -q)
+  CID=$(crictl ps -q --pod $PID)
+  IP=$(crictl exec $CID ip a | grep 240 | awk '{print $2}' | cut -f1 -d'/')
+  curl $IP
 }
 ```
 
@@ -409,13 +405,12 @@ Commercial support is available at
 </html>
 ```
 
-As we can see we successfully reached out container from our host.
+As we can see we successfully reached out container from the host.
 
-But we remember that cni plugin also responsible to configure communication between containers.
-Lets check
+But we remember that cni plugin is also responsible to configure communication between containers.
+Let's check
 
 To do that we will run 1 more pod with busybox inside
-
 ```bash
 cat <<EOF> /etc/kubernetes/manifests/static-pod.yml
 apiVersion: v1
@@ -433,7 +428,7 @@ spec:
 EOF
 ```
 
-Now, lets, check and ensure that pod created
+Now, let's check and ensure that the pod created
 
 ```bash
 crictl pods
@@ -447,16 +442,16 @@ a6881b7bba036       18 minutes ago      Ready               static-nginx-example
 4dd70fb8f5f53       18 minutes ago      Ready               static-nginx-2-example-server   default             0                   (default)
 ```
 
-As pod is in running state, we can check wheather our other nging pods are available
+As the pod is in a running state, we can check whether the other nginx pod are available
 
 ```bash
 {
-PID=$(crictl pods --label app=static-nginx-2 -q)
-CID=$(crictl ps -q --pod $PID)
-IP=$(crictl exec $CID ip a | grep 240 | awk '{print $2}' | cut -f1 -d'/')
-PID_0=$(crictl pods --label app=static-pod -q)
-CID_0=$(crictl ps -q --pod $PID_0)
-crictl exec $CID_0 wget -O - $IP
+  PID=$(crictl pods --label app=static-nginx-2 -q)
+  CID=$(crictl ps -q --pod $PID)
+  IP=$(crictl exec $CID ip a | grep 240 | awk '{print $2}' | cut -f1 -d'/')
+  PID_0=$(crictl pods --label app=static-pod -q)
+  CID_0=$(crictl ps -q --pod $PID_0)
+  crictl exec $CID_0 wget -O - $IP
 }
 ```
 
@@ -493,15 +488,14 @@ written to stdout
 
 As we can see we successfully reached our container from busybox.
 
-In this section we configured CNI plugin for our intallation and now we can run pods which can communicate with each other over the network.
+In this section, we configured the cni plugin. Now we can run pods that can communicate with each other over the network.
 
-In nest section we will procede with the kubernetes cluster configuration, but before, we need to clean up workspace.
+Now we clean up the workspace
 ```bash
 rm /etc/kubernetes/manifests/static-*
 ```
 
 And check if app pods are removed
-
 ```bash
 crictl pods
 ```
@@ -510,5 +504,7 @@ Output:
 ```
 POD ID              CREATED             STATE               NAME                        NAMESPACE           ATTEMPT             RUNTIME
 ```
+
+Note: it takes some time to remove all created resources.
 
 Next: [ETCD](./04-etcd.md)

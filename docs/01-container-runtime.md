@@ -28,9 +28,9 @@ After the download process is complete, we need to move runc binaries to proper 
 
 ```bash
 {
-    sudo mv runc.amd64 runc
-    chmod +x runc 
-    sudo mv runc /usr/local/bin/
+  sudo mv runc.amd64 runc
+  chmod +x runc 
+  sudo mv runc /usr/local/bin/
 }
 ```
 
@@ -38,14 +38,14 @@ Now, as we have runc configured, we can run busybox container
 
 ```bash
 {
-mkdir -p ~/busybox-container/rootfs/bin
-cd ~/busybox-container/rootfs/bin
-wget https://www.busybox.net/downloads/binaries/1.31.0-defconfig-multiarch-musl/busybox-x86_64
-chmod +x busybox-x86_64
-./busybox-x86_64 --install .
-cd ~/busybox-container
-runc spec
-sed -i 's/"sh"/"echo","Hello from container runned by runc!"/' config.json
+  mkdir -p ~/busybox-container/rootfs/bin
+  cd ~/busybox-container/rootfs/bin
+  wget https://www.busybox.net/downloads/binaries/1.31.0-defconfig-multiarch-musl/busybox-x86_64
+  chmod +x busybox-x86_64
+  ./busybox-x86_64 --install .
+  cd ~/busybox-container
+  runc spec
+  sed -i 's/"sh"/"echo","Hello from container runned by runc!"/' config.json
 }
 ```
 
@@ -63,8 +63,8 @@ Hello from container runned by runc!
 Great, we created our first container in this tutorial. Now we will clean up our workspace.
 ```bash
 {
-cd ~
-rm -r busybox-container
+  cd ~
+  rm -r busybox-container
 }
 ```
 
@@ -88,9 +88,9 @@ After download process complete, we need to unzip and move containerd binaries t
 
 ```bash
 {
-    mkdir containerd
-    tar -xvf containerd-1.4.4-linux-amd64.tar.gz -C containerd
-    sudo mv containerd/bin/* /bin/
+  mkdir containerd
+  tar -xvf containerd-1.4.4-linux-amd64.tar.gz -C containerd
+  sudo mv containerd/bin/* /bin/
 }
 ```
 
@@ -233,8 +233,8 @@ ctr containers rm busybox-container
 We can check that list of containers and tasks should be empty
 ```bash
 {
-ctr task ls
-ctr containers ls
+  ctr task ls
+  ctr containers ls
 }
 ``` 
 

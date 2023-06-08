@@ -16,6 +16,8 @@ Previously we worked with containers, but on this step, we will work with other 
 As you remember at the end, kubernetes usually start pods. So now we will try to create it. But it is a bit not the usual way, instead of using kubernetes api (which we didn't configure yet), we will create pods with the usage of kubelet only.
 To do that we will use the [static pods](https://kubernetes.io/docs/tasks/configure-pod-container/static-pod/) functionality.
 
+## configure
+
 So, let's begin.
 
 First of all, we need to download kubelet.
@@ -91,14 +93,16 @@ Output:
 ...
 ```
 
+## verify
+
 After kubelet service is up and running, we can start creating our pods.
 
 Before we will create static pod manifests, we need to create folders where we will place our pods (same as we configured in kubelet)
 
 ```bash
 {
-mkdir /etc/kubernetes
-mkdir /etc/kubernetes/manifests
+  mkdir /etc/kubernetes
+  mkdir /etc/kubernetes/manifests
 }
 ```
 
@@ -250,8 +254,8 @@ rm /etc/kubernetes/manifests/static-pod.yml
 It takes some time to remove the pods, we can ensure that pods are deleted by running
 ```bash
 {
-crictl pods
-crictl ps
+  crictl pods
+  crictl ps
 }
 ```
 

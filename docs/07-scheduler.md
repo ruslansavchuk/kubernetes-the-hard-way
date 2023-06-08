@@ -221,7 +221,13 @@ hello-world   0/1     Pending   0          24m   <none>   <none>   <none>       
 As you can see, our pod still in pending mode.
 
 To define the reason of this, we will review the logs of our scheduler.
+
 ```bash
+journalctl -u kube-scheduler | grep not-ready
+```
+
+Output:
+```
 ...
 May 21 20:52:25 example-server kube-scheduler[91664]: I0521 20:52:25.471604   91664 factory.go:338] "Unable to schedule pod; no fit; waiting" pod="default/hello-world" err="0/1  nodes are available: 1 node(s) had taint {node.kubernetes.io/not-ready: }, that the pod didn't tolerate."
 ...
@@ -259,6 +265,16 @@ As you can see out pod is in running state, means that scheduler works as expect
 Now we need to clean-up our wirkspace
 ```bash
 kubectl delete -f pod.yaml
+```
+
+Check if pod deleted
+```bash
+kubectl get pod
+```
+
+Outpput:
+```
+No resources found in default namespace.
 ```
 
 Next: [Controller manager](./08-controller-manager.md )
