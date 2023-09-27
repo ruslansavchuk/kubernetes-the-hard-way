@@ -243,8 +243,8 @@ Output:
 [{"effect":"NoSchedule","key":"node.kubernetes.io/not-ready"}]
 ```
 
-As you can see, our node has taint with efect no schedule. The reason of this????
-But lets fix this.
+As you can see, our node has taint with efect no schedule.
+Lets fix this.
 ```bash
 kubectl taint nodes $(hostname -a) node.kubernetes.io/not-ready:NoSchedule-
 ```
@@ -262,7 +262,7 @@ hello-world   1/1     Running   0          29m   10.240.1.3   example-server   <
 
 As you can see out pod is in running state, means that scheduler works as expected.
 
-Now we need to clean-up our wirkspace
+Now we need to clean-up our workspace
 ```bash
 kubectl delete -f pod.yaml
 ```
