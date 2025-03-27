@@ -23,3 +23,21 @@ To configure the cluster mentioned, we will use Ubuntu server 20.04 (author uses
 * [Controller manager](./docs/08-controller-manager.md)
 * [Kube-proxy](./docs/09-kubeproxy.md)
 * [DNS in Kubernetes](./docs/10-dns.md)
+
+
+
+docker build -t ubuntu-systemd .
+
+
+docker run -d \
+  --name ubuntu-systemd-container \
+  --privileged \
+  --security-opt seccomp=unconfined \
+  --security-opt apparmor=unconfined \
+  -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
+  -v /lib/modules:/lib/modules:ro \
+  --tmpfs /tmp \
+  --tmpfs /run \
+  --tmpfs /run/lock \
+  kindest/base:v20250312-b98dc21a \
+  /sbin/init
