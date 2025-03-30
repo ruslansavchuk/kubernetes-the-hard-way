@@ -190,8 +190,7 @@ docker.io/library/busybox:latest application/vnd.docker.distribution.manifest.li
 
 Now, let's start our container
 ```bash
-ctr run --detach --snapshotter native docker.io/library/busybox:latest busybox-container sh -c 'echo "Hello"'
-ctr run --detach docker.io/library/busybox:latest busybox-container sh -c 'echo "Hello"'
+ctr run --rm --snapshotter native docker.io/library/busybox:latest busybox-container sh -c 'echo "Hello"'
 ctr run --detach --runtime io.containerd.runc.v2 --snapshotter native docker.io/library/busybox:latest busybox-container sh -c 'sleep 3600'
 ctr run --detach docker.io/library/busybox:latest busybox-container sh -c 'echo "Hello from container runned by containerd!"'
 ```
