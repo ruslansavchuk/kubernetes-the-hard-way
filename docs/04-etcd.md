@@ -27,12 +27,10 @@ wget -q --show-progress --https-only --timestamping \
 
 And install them
 ```bash
-{
-  mv cfssl_1.4.1_linux_amd64 cfssl
-  mv cfssljson_1.4.1_linux_amd64 cfssljson
-  chmod +x cfssl cfssljson
-  sudo mv cfssl cfssljson /usr/local/bin/
-}
+mv cfssl_1.4.1_linux_amd64 cfssl \
+  && mv cfssljson_1.4.1_linux_amd64 cfssljson \
+  && chmod +x cfssl cfssljson \
+  && mv cfssl cfssljson /usr/local/bin/
 ```
 
 After the tools are installed successfully, we need to generate ca certificate.
@@ -132,13 +130,9 @@ kubernetes.pem
 
 And distribute certificate files created
 ```bash
-{
-  sudo mkdir -p /etc/etcd /var/lib/etcd
-  sudo chmod 700 /var/lib/etcd
-  sudo cp ca.pem \
-    kubernetes.pem kubernetes-key.pem \
-    /etc/etcd/
-}
+mkdir -p /etc/etcd /var/lib/etcd \
+  && chmod 700 /var/lib/etcd \
+  && cp ca.pem kubernetes.pem kubernetes-key.pem /etc/etcd/
 ```
 
 ## configure
@@ -151,15 +145,13 @@ wget -q --show-progress --https-only --timestamping \
 
 After the download is complete, we can move etcd binaries to the proper folders
 ```bash
-{
-  tar -xvf etcd-v3.4.15-linux-amd64.tar.gz
-  sudo mv etcd-v3.4.15-linux-amd64/etcd* /usr/local/bin/
-}
+tar -xvf etcd-v3.4.15-linux-amd64.tar.gz \
+  && mv etcd-v3.4.15-linux-amd64/etcd* /usr/local/bin/
 ```
 
 Now, we can configure etcd service
 ```bash
-cat <<EOF | sudo tee /etc/systemd/system/etcd.service
+cat <<EOF | tee /etc/systemd/system/etcd.service
 [Unit]
 Description=etcd
 Documentation=https://github.com/coreos
@@ -195,11 +187,9 @@ Configuration options specified:
 
 And finally, we need to run our etcd service
 ```bash
-{
-  sudo systemctl daemon-reload
-  sudo systemctl enable etcd
-  sudo systemctl start etcd
-}
+systemctl daemon-reload \
+  && systemctl enable etcd \
+  && systemctl start etcd
 ```
 
 To ensure that our service successfully started, run
@@ -225,7 +215,7 @@ Output:
 
 When etcd is up and running, we can check whether we can communicate with it
 ```
-sudo ETCDCTL_API=3 etcdctl member list \
+ETCDCTL_API=3 etcdctl member list \
   --endpoints=https://127.0.0.1:2379 \
   --cacert=/etc/etcd/ca.pem \
   --cert=/etc/etcd/kubernetes.pem \
