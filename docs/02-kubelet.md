@@ -23,9 +23,6 @@ So, let's begin.
 First of all, we need to download kubelet.
 ```bash
 wget -q --show-progress --https-only --timestamping \
-  https://storage.googleapis.com/kubernetes-release/release/v1.21.0/bin/linux/amd64/kubelet
-
-wget -q --show-progress --https-only --timestamping \
   https://dl.k8s.io/v1.32.3/kubernetes-node-linux-amd64.tar.gz
 
 tar -xvzf kubernetes-node-linux-amd64.tar.gz
@@ -33,15 +30,18 @@ tar -xvzf kubernetes-node-linux-amd64.tar.gz
 
 After download process complete, move kubelet binaries to the proper folder
 ```bash
-{
-  chmod +x kubelet 
-  sudo mv kubelet /usr/local/bin/
-}
+# chmod +x kubelet \
+#   && mv kubelet /usr/local/bin/
 ```
 
 ```bash
 chmod +x kubernetes/node/bin/kubelet \
   && mv kubernetes/node/bin/kubelet /usr/local/bin/
+```
+
+```bash
+ensure swap is disabled
+swapoff -a
 ```
 
 As kubelet is a service that is used to manage pods running on the node, we need to configure that service
