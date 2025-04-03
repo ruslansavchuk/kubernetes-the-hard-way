@@ -1,7 +1,7 @@
 FROM ubuntu:22.04
 
 RUN apt update \
-    && apt install -y wget systemd kmod systemd-sysv \
+    && apt install -y wget systemd kmod systemd-sysv vim less iptables \
     && rm -rf /var/lib/apt/lists/* 
 
 RUN systemctl set-default multi-user.target
