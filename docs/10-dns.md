@@ -11,7 +11,7 @@ If you remember, in previous section we accessed service by using its IP address
 Befire we will configure it, we can check if we can access our service (created in previuos section) by its name.
 
 ```bash
-kubectl exec busy-box -- wget -O - nginx-service
+kubectl exec busy-box -- wget -O - nginx-service.default.svc.cluster.local.
 ```
 
 And nothing happen. The reason of this befaviour - pod can't resolve IP address of the domain name requested as DNS server is not configured in our cluster. 
@@ -31,7 +31,7 @@ kubectl apply -f https://raw.githubusercontent.com/ruslansavchuk/kubernetes-the-
 
 After our DNS server is up and running, we can try to repeat the call once again
 ```bash
-kubectl exec busy-box -- wget -O - nginx-service
+kubectl exec busy-box -- wget -O - nginx-service.default.svc.cluster.local.
 ```
 
 Output:

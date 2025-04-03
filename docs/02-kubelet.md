@@ -23,8 +23,7 @@ So, let's begin.
 First of all, we need to download kubelet.
 ```bash
 wget -q --show-progress --https-only --timestamping \
-  https://dl.k8s.io/v1.32.3/kubernetes-node-linux-amd64.tar.gz
-
+  https://dl.k8s.io/v1.32.3/bin/linux/amd64/kubelet
 tar -xvzf kubernetes-node-linux-amd64.tar.gz
 ```
 

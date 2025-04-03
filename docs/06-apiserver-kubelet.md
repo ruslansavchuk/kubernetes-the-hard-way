@@ -10,8 +10,8 @@ Again we will start this part with the creation of the certificates which will b
 
 ```bash
 {
-HOST_NAME=$(hostname -a)
-cat > kubelet-csr.json <<EOF
+HOST_NAME=$(cat /etc/hostname)
+cat <<EOF | tee kubelet-csr.json 
 {
   "CN": "system:node:${HOST_NAME}",
   "key": {
@@ -56,10 +56,8 @@ We specified "system:nodes" in the organization. It says api server that the cli
 Now we need to distribute certificates generated.
 
 ```bash
-{
-  sudo cp kubelet-key.pem kubelet.pem /var/lib/kubelet/
-  sudo cp ca.pem /var/lib/kubernetes/
-}
+cp kubelet-key.pem kubelet.pem /var/lib/kubelet/ \
+  && cp ca.pem /var/lib/kubernetes/
 ```
 
 ## service configuration
@@ -68,7 +66,7 @@ After certificates configured and distributed, we need to prepare configuration 
 
 ```bash
 {
-HOST_NAME=$(hostname -a)
+HOST_NAME=$(cat /etc/hostname)
 kubectl config set-cluster kubernetes-the-hard-way \
     --certificate-authority=ca.pem \
     --embed-certs=true \
@@ -95,29 +93,24 @@ We created kubernetes configuration file, which says kubelet where api server is
 And now, move all our configuration settings to the proper folders
 
 ```bash
-sudo cp kubelet.kubeconfig /var/lib/kubelet/kubeconfig
+cp kubelet.kubeconfig /var/lib/kubelet/kubeconfig
 ```
 
 Also, we need to create KubeletConfiguration
 ```bash
-cat <<EOF | sudo tee /var/lib/kubelet/kubelet-config.yaml
-kind: KubeletConfiguration
+cat <<EOF | tee /var/lib/kubelet/kubelet-config.yaml
 apiVersion: kubelet.config.k8s.io/v1beta1
+kind: KubeletConfiguration
 authentication:
   anonymous:
-    enabled: false
-  webhook:
     enabled: true
-  x509:
-    clientCAFile: "/var/lib/kubernetes/ca.pem"
+  webhook:
+    enabled: false
 authorization:
-  mode: Webhook
-clusterDomain: "cluster.local"
-clusterDNS:
-  - "10.32.0.10"
-podCIDR: "10.240.1.0/24"
-resolvConf: "/run/systemd/resolve/resolv.conf"
-runtimeRequestTimeout: "15m"
+  mode: AlwaysAllow
+networkPlugin: "cni"
+cniConfDir: "/etc/cni/net.d"
+cniBinDir: "/opt/cni/bin"
 tlsCertFile: "/var/lib/kubelet/kubelet.pem"
 tlsPrivateKeyFile: "/var/lib/kubelet/kubelet-key.pem"
 EOF
@@ -131,7 +124,7 @@ Configuration options I want to highlight:
 
 And the last step - we need to update service configuration file
 ```bash
-cat <<EOF | sudo tee /etc/systemd/system/kubelet.service
+cat <<EOF | tee /etc/systemd/system/kubelet.service
 [Unit]
 Description=Kubernetes Kubelet
 Documentation=https://github.com/kubernetes/kubernetes
@@ -140,14 +133,13 @@ Requires=containerd.service
 
 [Service]
 ExecStart=/usr/local/bin/kubelet \\
-  --config=/var/lib/kubelet/kubelet-config.yaml \\
-  --container-runtime=remote \\
   --container-runtime-endpoint=unix:///var/run/containerd/containerd.sock \\
-  --image-pull-progress-deadline=2m \\
+  --file-check-frequency=10s \\
+  --config=/var/lib/kubelet/kubelet-config.yaml \\
+  --pod-manifest-path='/etc/kubernetes/manifests/' \\
   --kubeconfig=/var/lib/kubelet/kubeconfig \\
-  --network-plugin=cni \\
   --register-node=true \\
-  --v=2
+  --v=10
 Restart=on-failure
 RestartSec=5
 
@@ -159,18 +151,16 @@ EOF
 And reload it
 
 ```bash
-{
-  sudo systemctl daemon-reload
-  sudo systemctl enable kubelet
-  sudo systemctl restart kubelet
-}
+systemctl daemon-reload \
+  && systemctl enable kubelet \
+  && systemctl restart kubelet
 ```
 
 ## verification
 
 And check service status
 ```bash
-sudo systemctl status kubelet
+systemctl status kubelet
 ```
 
 Output:

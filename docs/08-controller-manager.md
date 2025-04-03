@@ -102,7 +102,7 @@ We specified "system:kube-controller-manager" in the organization. It says api s
 
 Now, we will distribute ca certificate, this ????
 ```bash
-sudo cp ca-key.pem /var/lib/kubernetes/
+cp ca-key.pem /var/lib/kubernetes/
 ```
 
 ## configuration
@@ -136,26 +136,24 @@ We created kubernetes configuration file, which says controller manager where ap
 
 Now, we can distribute created configuration file.
 ```bash
-sudo mv kube-controller-manager.kubeconfig /var/lib/kubernetes/
+mv kube-controller-manager.kubeconfig /var/lib/kubernetes/
 ```
 
 After all required configuration file created, we need to download controller manager binaries.
 ```bash
 wget -q --show-progress --https-only --timestamping \
-  "https://storage.googleapis.com/kubernetes-release/release/v1.21.0/bin/linux/amd64/kube-controller-manager"
+  "https://dl.k8s.io/v1.32.3/bin/linux/amd64/kube-controller-manager"
 ```
 
 And install it
 ```bash
-{
-  chmod +x kube-controller-manager
-  sudo mv kube-controller-manager /usr/local/bin/
-}
+chmod +x kube-controller-manager \
+  && mv kube-controller-manager /usr/local/bin/
 ```
 
 Now, we can create configuration file for controller manager service
 ```bash
-cat <<EOF | sudo tee /etc/systemd/system/kube-controller-manager.service
+cat <<EOF | tee /etc/systemd/system/kube-controller-manager.service
 [Unit]
 Description=Kubernetes Controller Manager
 Documentation=https://github.com/kubernetes/kubernetes
@@ -184,16 +182,14 @@ EOF
 
 After configuration file created, we can start controller manager
 ```bash
-{
-  sudo systemctl daemon-reload
-  sudo systemctl enable kube-controller-manager
-  sudo systemctl start kube-controller-manager
-}
+systemctl daemon-reload \
+  && systemctl enable kube-controller-manager \
+  && systemctl start kube-controller-manager
 ```
 
 And finaly we can check controller manadger status
 ```bash
-sudo systemctl status kube-controller-manager
+systemctl status kube-controller-manager
 ```
 
 Output:

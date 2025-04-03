@@ -38,7 +38,7 @@ After the tools are installed successfully, we need to generate ca certificate.
 A ca (Certificate Authority) certificate, also known as a root certificate or a trusted root certificate, is a digital certificate that is used to verify the authenticity of other certificates.
 ```bash
 {
-cat > ca-config.json <<EOF
+cat <<EOF | tee ca-config.json 
 {
   "signing": {
     "default": {
@@ -54,7 +54,7 @@ cat > ca-config.json <<EOF
 }
 EOF
 
-cat > ca-csr.json <<EOF
+cat <<EOF | tee ca-csr.json
 {
   "CN": "Kubernetes",
   "key": {
@@ -92,7 +92,7 @@ Now, we can create certificate files signed by our ca file.
 HOST_NAME=$(hostname -a)
 KUBERNETES_HOSTNAMES=kubernetes,kubernetes.default,kubernetes.default.svc,kubernetes.default.svc.cluster,kubernetes.svc.cluster.local
 
-cat > kubernetes-csr.json <<EOF
+cat <<EOF | tee kubernetes-csr.json 
 {
   "CN": "kubernetes",
   "key": {
