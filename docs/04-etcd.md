@@ -214,7 +214,7 @@ Output:
 ## verify
 
 When etcd is up and running, we can check whether we can communicate with it
-```
+```bash
 ETCDCTL_API=3 etcdctl member list \
   --endpoints=https://127.0.0.1:2379 \
   --cacert=/etc/etcd/ca.pem \

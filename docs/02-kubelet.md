@@ -24,22 +24,16 @@ First of all, we need to download kubelet.
 ```bash
 wget -q --show-progress --https-only --timestamping \
   https://dl.k8s.io/v1.32.3/bin/linux/amd64/kubelet
-tar -xvzf kubernetes-node-linux-amd64.tar.gz
 ```
 
 After download process complete, move kubelet binaries to the proper folder
 ```bash
-# chmod +x kubelet \
-#   && mv kubelet /usr/local/bin/
+chmod +x kubelet \
+  && mv kubelet /usr/local/bin/
 ```
 
+Ensure swap is disabled
 ```bash
-chmod +x kubernetes/node/bin/kubelet \
-  && mv kubernetes/node/bin/kubelet /usr/local/bin/
-```
-
-```bash
-ensure swap is disabled
 swapoff -a
 ```
 

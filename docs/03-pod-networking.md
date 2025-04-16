@@ -37,7 +37,7 @@ As we can see our nginx container is up and running.
 Let's check whether it works as expected.
 
 ```bash
-curl localhost
+wget -O- localhost
 ```
 
 Output:
@@ -178,7 +178,9 @@ crictl pods
 
 Output:
 ```
-POD ID              CREATED             STATE               NAME                NAMESPACE           ATTEMPT             RUNTIME
+POD ID              CREATED              STATE               NAME                          NAMESPACE           ATTEMPT             RUNTIME
+dd37d609e012d       About a minute ago   NotReady            static-nginx-2-b66c13e037b3   default             0                   (default)
+42c3883717b2d       About a minute ago   NotReady            static-nginx-b66c13e037b3     default             0                   (default)
 ```
 
 We see nothing.
@@ -390,7 +392,7 @@ So, let's try to curl the container.
   PID=$(crictl pods --label app=static-nginx-2 -q)
   CID=$(crictl ps -q --pod $PID)
   IP=$(crictl exec $CID ip a | grep 240 | awk '{print $2}' | cut -f1 -d'/')
-  curl $IP
+  wget -O- $IP
 }
 ```
 
@@ -496,10 +498,6 @@ Commercial support is available at
 <p><em>Thank you for using nginx.</em></p>
 </body>
 </html>
-Connecting to 10.240.1.4 (10.240.1.4:80)
-writing to stdout
--                    100% |********************************|   615  0:00:00 ETA
-written to stdout
 ```
 
 As we can see we successfully reached our container from busybox.

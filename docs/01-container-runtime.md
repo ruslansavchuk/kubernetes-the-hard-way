@@ -42,7 +42,7 @@ mkdir -p busybox-container/rootfs/bin \
   && ./busybox-x86_64 --install . \
   && cd ./../.. \
   && runc spec \
-  && sed -i 's/"sh"/"echo","Hello from container runned by runc!","sleep","3600"/' config.json
+  && sed -i 's/"sh"/"echo","Hello from container runned by runc!"/' config.json
 ```
 
 In this step, we downloaded the busybox image, unarchived it, and created the proper files, required by runc to run the container (including container configuration and files that will be accessible from the container). So, let's run our container
@@ -190,9 +190,7 @@ docker.io/library/busybox:latest application/vnd.docker.distribution.manifest.li
 
 Now, let's start our container
 ```bash
-ctr run --rm --snapshotter native docker.io/library/busybox:latest busybox-container sh -c 'echo "Hello"'
-ctr run --detach --runtime io.containerd.runc.v2 --snapshotter native docker.io/library/busybox:latest busybox-container sh -c 'sleep 3600'
-ctr run --detach docker.io/library/busybox:latest busybox-container sh -c 'echo "Hello from container runned by containerd!"'
+ctr run --detach --snapshotter native docker.io/library/busybox:latest busybox-container sh -c 'while sleep 1; do echo "Hi"; done'
 ```
 
 Output:
@@ -219,12 +217,19 @@ ctr task ls
 Output:
 ```
 TASK                  PID        STATUS
-busybox-container     2862580    STOPPED
+busybox-container     2862580    RUNNING
 ```
 
 As we can see our container is in the stopped state (because the command was successfully executed and the container stopped).
 
 Now, let's clean up our workspace and go to the next section.
+
+Stop running command
+```bash
+kill -9 $(ctr task ls | grep busybox | awk '{print $2}')
+```
+
+And remove the created container
 ```bash
 ctr containers rm busybox-container
 ```

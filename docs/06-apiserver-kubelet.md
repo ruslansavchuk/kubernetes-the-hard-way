@@ -233,47 +233,6 @@ kubectl logs hello-world
 
 Output:
 ```
-Error from server (Forbidden): Forbidden (user=kubernetes, verb=get, resource=nodes, subresource=proxy) ( pods/log hello-world)
-```
-
-As we can see api server has no permissions to read logs from the node. This message apears, because during authorization, kubelet ask api server if the user with the name kubernetes has proper permission, but now it is not true. So let's fix this
-```bash
-{
-cat <<EOF> node-auth.yml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: node-proxy-access
-rules:
-- apiGroups: [""]
-  resources: ["nodes/proxy"]
-  verbs: ["get"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: node-proxy-access-binding
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: node-proxy-access
-subjects:
-- apiGroup: rbac.authorization.k8s.io
-  kind: User
-  name: kubernetes
-EOF
-
-kubectl apply -f node-auth.yml
-}
-```
-
-After our cluster role and role binding creted we can retry
-```bash
-kubectl logs hello-world
-```
-
-Output:
-```
 Hello, World!
 Hello, World!
 Hello, World!
@@ -282,8 +241,6 @@ Hello, World!
 ```
 
 As you can see, we can create pods and kubelet will run that pods.
-
-Note: it takes some time to apply created RBAC policies.
 
 Now, we need to clean-up out workspace.
 ```bash

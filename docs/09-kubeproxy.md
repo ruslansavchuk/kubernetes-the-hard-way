@@ -94,47 +94,6 @@ kubectl exec busy-box -- wget -O - $(kubectl get pod -o wide | grep nginx | awk 
 
 Output:
 ```
-error: unable to upgrade connection: Forbidden (user=kubernetes, verb=create, resource=nodes, subresource=proxy)
-```
-
-This error occured, because api server has no access to execute commands. We will fix this issue, by creating cluster role and assigning it role to kubernetes user. 
-```bash
-{
-cat <<EOF | tee rbac-create.yml
-kind: ClusterRole
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: kubernetes-user-clusterrole
-rules:
-- apiGroups: [""]
-  resources: ["nodes/proxy"]
-  verbs: ["create"]
----
-kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: kubernetes-user-clusterrolebinding
-subjects:
-- kind: User
-  name: kubernetes
-  apiGroup: rbac.authorization.k8s.io
-roleRef:
-  kind: ClusterRole
-  name: kubernetes-user-clusterrole
-  apiGroup: rbac.authorization.k8s.io
-EOF
-
-kubectl apply -f rbac-create.yml
-}
-```
-
-Now, we can execute command
-```bash
-kubectl exec busy-box -- wget -O - $(kubectl get pod -o wide | grep nginx | awk '{print $6}' | head -n 1)
-```
-
-Output:
-```
 Hello from pod: nginx-deployment-68b9c94586-qkwjc
 Connecting to 10.32.0.230 (10.32.0.230:80)
 writing to stdout
@@ -347,5 +306,3 @@ written to stdout
 ```
 
 If you try to repeat the command once again you will see that requests are handled by different pods.
-
-Next: [DNS in Kubernetes](./10-dns.md)
