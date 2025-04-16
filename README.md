@@ -24,33 +24,3 @@ To run the labs you need one of the following:
 * [Scheduler](./docs/07-scheduler.md)
 * [Controller manager](./docs/08-controller-manager.md)
 * [Kube-proxy](./docs/09-kubeproxy.md)
-
-
-
-docker build -t ubuntu-systemd .
-
-
-docker run -d \
-  --name ubuntu-systemd-container \
-  --privileged \
-  --security-opt seccomp=unconfined \
-  --security-opt apparmor=unconfined \
-  --cap-add=NET_ADMIN \
-  --cap-add=NET_RAW \
-  -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
-  --tmpfs /tmp \
-  --tmpfs /run \
-  --tmpfs /run/lock \
-  ubuntu-systemd
-
-
-docker run -d \
-  --name ubuntu-systemd-container \
-  --privileged \
-  --security-opt seccomp=unconfined \
-  --security-opt apparmor=unconfined \
-  -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
-  --tmpfs /tmp \
-  --tmpfs /run \
-  --tmpfs /run/lock \
-  ubuntu-systemd
