@@ -37,7 +37,7 @@ As we can see our nginx container is up and running.
 Let's check whether it works as expected.
 
 ```bash
-curl localhost
+wget -O- localhost
 ```
 
 Output:
@@ -178,7 +178,9 @@ crictl pods
 
 Output:
 ```
-POD ID              CREATED             STATE               NAME                NAMESPACE           ATTEMPT             RUNTIME
+POD ID              CREATED              STATE               NAME                          NAMESPACE           ATTEMPT             RUNTIME
+dd37d609e012d       About a minute ago   NotReady            static-nginx-2-b66c13e037b3   default             0                   (default)
+42c3883717b2d       About a minute ago   NotReady            static-nginx-b66c13e037b3     default             0                   (default)
 ```
 
 We see nothing.
@@ -208,12 +210,12 @@ First of all, we need to download that plugin
 
 ```bash
 wget -q --show-progress --https-only --timestamping \
-  https://github.com/containernetworking/plugins/releases/download/v0.9.1/cni-plugins-linux-amd64-v0.9.1.tgz
+  https://github.com/containernetworking/plugins/releases/download/v1.6.2/cni-plugins-linux-amd64-v1.6.2.tgz
 ```
 
 Now, we will create proper folders structure
 ```bash
-sudo mkdir -p \
+mkdir -p \
   /etc/cni/net.d \
   /opt/cni/bin
 ```
@@ -225,13 +227,15 @@ here:
 Now, we will untar the plugin to the proper folder
 
 ```bash
-sudo tar -xvf cni-plugins-linux-amd64-v0.9.1.tgz -C /opt/cni/bin/
+tar -xvf cni-plugins-linux-amd64-v1.6.2.tgz -C /opt/cni/bin/
 ```
+
+do not forget about iptables
 
 And create plugin configuration
 ```bash
 {
-cat <<EOF | sudo tee /etc/cni/net.d/10-bridge.conf
+cat <<EOF | tee /etc/cni/net.d/10-bridge.conf
 {
     "cniVersion": "0.4.0",
     "name": "bridge",
@@ -249,7 +253,7 @@ cat <<EOF | sudo tee /etc/cni/net.d/10-bridge.conf
 }
 EOF
 
-cat <<EOF | sudo tee /etc/cni/net.d/99-loopback.conf
+cat <<EOF | tee /etc/cni/net.d/99-loopback.conf
 {
     "cniVersion": "0.4.0",
     "name": "lo",
@@ -265,7 +269,25 @@ Of course, all configuration options here are important, but I want to highlight
 
 Update the kubelet config (add network-plugin configuration option)
 ```bash
-cat <<EOF | sudo tee /etc/systemd/system/kubelet.service
+cat <<EOF | tee /var/lib/kubelet/kubelet-config.yaml
+apiVersion: kubelet.config.k8s.io/v1beta1
+kind: KubeletConfiguration
+authentication:
+  anonymous:
+    enabled: true
+  webhook:
+    enabled: false
+authorization:
+  mode: AlwaysAllow
+networkPlugin: "cni"
+cniConfDir: "/etc/cni/net.d"
+cniBinDir: "/opt/cni/bin"
+EOF
+```
+
+
+```bash
+cat <<EOF | tee /etc/systemd/system/kubelet.service
 [Unit]
 Description=kubelet: The Kubernetes Node Agent
 Documentation=https://kubernetes.io/docs/home/
@@ -274,11 +296,9 @@ After=network-online.target
 
 [Service]
 ExecStart=/usr/local/bin/kubelet \\
-  --container-runtime=remote \\
   --container-runtime-endpoint=unix:///var/run/containerd/containerd.sock \\
-  --image-pull-progress-deadline=2m \\
   --file-check-frequency=10s \\
-  --network-plugin=cni \\
+  --config=/var/lib/kubelet/kubelet-config.yaml \\
   --pod-manifest-path='/etc/kubernetes/manifests/' \\
   --v=10
 Restart=always
@@ -292,15 +312,13 @@ EOF
 
 After the kubelet is reconfigured, we can restart it
 ```bash
-{
-  sudo systemctl daemon-reload
-  sudo systemctl restart kubelet
-}
+systemctl daemon-reload \
+  && systemctl restart kubelet
 ```
 
 And check kubelet status
 ```bash
-sudo systemctl status kubelet
+systemctl status kubelet
 ```
 
 Output:
@@ -374,7 +392,7 @@ So, let's try to curl the container.
   PID=$(crictl pods --label app=static-nginx-2 -q)
   CID=$(crictl ps -q --pod $PID)
   IP=$(crictl exec $CID ip a | grep 240 | awk '{print $2}' | cut -f1 -d'/')
-  curl $IP
+  wget -O- $IP
 }
 ```
 
@@ -480,10 +498,6 @@ Commercial support is available at
 <p><em>Thank you for using nginx.</em></p>
 </body>
 </html>
-Connecting to 10.240.1.4 (10.240.1.4:80)
-writing to stdout
--                    100% |********************************|   615  0:00:00 ETA
-written to stdout
 ```
 
 As we can see we successfully reached our container from busybox.

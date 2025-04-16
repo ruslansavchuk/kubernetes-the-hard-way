@@ -23,6 +23,7 @@ metadata:
   name: hello-world
 spec:
   serviceAccountName: hello-world
+  terminationGracePeriodSeconds: 1
   containers:
     - name: hello-world-container
       image: busybox
@@ -121,16 +122,16 @@ We created kubernetes configuration file, which says scheduler where api server 
 Now, we can distribute created configuration file.
 
 ```bash
-sudo mv kube-scheduler.kubeconfig /var/lib/kubernetes/
+mv kube-scheduler.kubeconfig /var/lib/kubernetes/
 ```
 
 In addition to this file, we will create one more configuration file for scheduler
 
 ```bash
 {
-mkdir /etc/kubernetes/config
-cat <<EOF | sudo tee /etc/kubernetes/config/kube-scheduler.yaml
-apiVersion: kubescheduler.config.k8s.io/v1beta1
+mkdir -p /etc/kubernetes/config
+cat <<EOF | tee /etc/kubernetes/config/kube-scheduler.yaml
+apiVersion: kubescheduler.config.k8s.io/v1
 kind: KubeSchedulerConfiguration
 clientConnection:
   kubeconfig: "/var/lib/kubernetes/kube-scheduler.kubeconfig"
@@ -144,21 +145,19 @@ After all configuration files created, we need to download scheduler binaries.
 
 ```bash
 wget -q --show-progress --https-only --timestamping \
-  "https://storage.googleapis.com/kubernetes-release/release/v1.21.0/bin/linux/amd64/kube-scheduler"
+  "https://dl.k8s.io/v1.32.3/bin/linux/amd64/kube-scheduler"
 ```
 
 And install it
 
 ```bash
-{
-  chmod +x kube-scheduler
-  sudo mv kube-scheduler /usr/local/bin/
-}
+chmod +x kube-scheduler \
+  && mv kube-scheduler /usr/local/bin/
 ```
 
 Now, we can create configuration file for scheduler service
 ```bash
-cat <<EOF | sudo tee /etc/systemd/system/kube-scheduler.service
+cat <<EOF | tee /etc/systemd/system/kube-scheduler.service
 [Unit]
 Description=Kubernetes Scheduler
 Documentation=https://github.com/kubernetes/kubernetes
@@ -178,17 +177,15 @@ EOF
 After configuration file created, we need to run it
 
 ```bash
-{
-  sudo systemctl daemon-reload
-  sudo systemctl enable kube-scheduler
-  sudo systemctl start kube-scheduler
-}
+systemctl daemon-reload \
+  && systemctl enable kube-scheduler \
+  && systemctl start kube-scheduler
 ```
 
 And finally we check scheduler status
 
 ```bash
-sudo systemctl status kube-scheduler
+systemctl status kube-scheduler
 ```
 
 Output:
@@ -235,7 +232,7 @@ May 21 20:52:25 example-server kube-scheduler[91664]: I0521 20:52:25.471604   91
 
 As we can see our pod wasn't assigned to the node because node has some taint, lets check our node taints.
 ```bash
-kubectl get nodes $(hostname -a) -o jsonpath='{.spec.taints}'
+kubectl get nodes $(cat /etc/hostname) -o jsonpath='{.spec.taints}'
 ```
 
 Output:
@@ -246,7 +243,7 @@ Output:
 As you can see, our node has taint with efect no schedule.
 Lets fix this.
 ```bash
-kubectl taint nodes $(hostname -a) node.kubernetes.io/not-ready:NoSchedule-
+kubectl taint nodes $(cat /etc/hostname) node.kubernetes.io/not-ready:NoSchedule-
 ```
 
 And check our pods list again

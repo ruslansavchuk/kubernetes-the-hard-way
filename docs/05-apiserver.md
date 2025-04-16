@@ -13,7 +13,7 @@ As you can see from the description, api server is a central (not the main) comp
 Before we begin with the configuration of the api server, we need to create certificates for kubernetes that will be used to sign service account tokens.
 ```bash
 {
-cat > service-account-csr.json <<EOF
+cat <<EOF | tee service-account-csr.json 
 {
   "CN": "service-accounts",
   "key": {
@@ -43,14 +43,11 @@ cfssl gencert \
 
 Now, we need to distribute certificates to the api server configuration folder
 ```bash
-{
-  mkdir /var/lib/kubernetes/
-  sudo cp \
-    ca.pem \
-    kubernetes.pem kubernetes-key.pem \
+mkdir -p /var/lib/kubernetes/ \
+  && cp \
+    ca.pem kubernetes.pem kubernetes-key.pem \
     service-account-key.pem service-account.pem \
     /var/lib/kubernetes/
-}
 ```
 
 As you can see, in addition to the generated service-account certificate file, we also distributed the certificate generated in the [previous](./04-etcd.md) section. We will use that certificate for communication between 
@@ -89,19 +86,21 @@ Now, when all required configuration/certificate files are created and distribut
 
 First of all, we need to download and install api server binaries
 
+https://kubernetes.io/releases/download/
 ```bash
-{
-  wget -q --show-progress --https-only --timestamping \
-    "https://storage.googleapis.com/kubernetes-release/release/v1.21.0/bin/linux/amd64/kube-apiserver"
-    chmod +x kube-apiserver
-  sudo mv kube-apiserver /usr/local/bin/
-}
+wget -q --show-progress --https-only --timestamping \
+  "https://dl.k8s.io/v1.32.3/bin/linux/amd64/kube-apiserver"
+```
+
+```bash
+chmod +x kube-apiserver \
+  && mv kube-apiserver /usr/local/bin/
 ```
 
 And create the service configuration file
 
 ```bash
-cat <<EOF | sudo tee /etc/systemd/system/kube-apiserver.service
+cat <<EOF | tee /etc/systemd/system/kube-apiserver.service
 [Unit]
 Description=Kubernetes API Server
 Documentation=https://github.com/kubernetes/kubernetes
@@ -149,16 +148,14 @@ Configuration options I want to highlight:
 
 Now, when api-server service is configured, we can start it
 ```bash
-{
-  sudo systemctl daemon-reload
-  sudo systemctl enable kube-apiserver
-  sudo systemctl start kube-apiserver
-}
+systemctl daemon-reload \
+  && systemctl enable kube-apiserver \
+  && systemctl start kube-apiserver
 ```
 
 And check the service status
 ```bash
-sudo systemctl status kube-apiserver
+systemctl status kube-apiserver
 ```
 
 Output:
@@ -180,9 +177,9 @@ Now, when our server is up and running, we want to communicate with it. To do th
 
 ```bash
 wget -q --show-progress --https-only --timestamping \
-  https://storage.googleapis.com/kubernetes-release/release/v1.21.0/bin/linux/amd64/kubectl \
+  https://dl.k8s.io/v1.32.3/bin/linux/386/kubectl \
   && chmod +x kubectl \
-  && sudo mv kubectl /usr/local/bin/
+  && mv kubectl /usr/local/bin/
 ```
 
 As the api server is configured in more or less secure mode, we need to provide some credentials when accessing it. We will use certificate files as the credentials. That is why we need to generate a proper certificate file that will allow us to access api server with administrator privileges
@@ -252,7 +249,7 @@ As already mentioned, api-server is the central kubernetes component, that store
 It means that we can create a pod, even when other components (kubelet, scheduler, controller manager) are not configured
 ```bash
 {
-HOST_NAME=$(hostname -a)
+HOST_NAME=$(cat /etc/hostname)
 
 cat <<EOF> pod.yaml
 apiVersion: v1
@@ -261,6 +258,7 @@ metadata:
   name: hello-world
 spec:
   serviceAccountName: hello-world
+  terminationGracePeriodSeconds: 1
   containers:
     - name: hello-world-container
       image: busybox

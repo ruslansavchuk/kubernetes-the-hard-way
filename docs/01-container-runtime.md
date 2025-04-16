@@ -21,32 +21,28 @@ First of all we need to download runc binaries
 
 ```bash
 wget -q --show-progress --https-only --timestamping \
-  https://github.com/opencontainers/runc/releases/download/v1.0.0-rc93/runc.amd64
+  https://github.com/opencontainers/runc/releases/download/v1.2.6/runc.amd64
 ```
 
 After the download process is complete, we need to move runc binaries to proper folder
 
 ```bash
-{
-  sudo mv runc.amd64 runc
-  chmod +x runc 
-  sudo mv runc /usr/local/bin/
-}
+mv runc.amd64 runc \
+  && chmod +x runc \
+  && mv runc /usr/local/bin/
 ```
 
 Now, as we have runc configured, we can run busybox container
 
 ```bash
-{
-  mkdir -p ~/busybox-container/rootfs/bin
-  cd ~/busybox-container/rootfs/bin
-  wget https://www.busybox.net/downloads/binaries/1.31.0-defconfig-multiarch-musl/busybox-x86_64
-  chmod +x busybox-x86_64
-  ./busybox-x86_64 --install .
-  cd ~/busybox-container
-  runc spec
-  sed -i 's/"sh"/"echo","Hello from container runned by runc!"/' config.json
-}
+mkdir -p busybox-container/rootfs/bin \
+  && cd busybox-container/rootfs/bin \
+  && wget https://www.busybox.net/downloads/binaries/1.31.0-defconfig-multiarch-musl/busybox-x86_64 \
+  && chmod +x busybox-x86_64 \
+  && ./busybox-x86_64 --install . \
+  && cd ./../.. \
+  && runc spec \
+  && sed -i 's/"sh"/"echo","Hello from container runned by runc!"/' config.json
 ```
 
 In this step, we downloaded the busybox image, unarchived it, and created the proper files, required by runc to run the container (including container configuration and files that will be accessible from the container). So, let's run our container
@@ -62,10 +58,8 @@ Hello from container runned by runc!
 
 Great, we created our first container in this tutorial. Now we will clean up our workspace.
 ```bash
-{
-  cd ~
-  rm -r busybox-container
-}
+cd .. \
+  && rm -r busybox-container
 ```
 
 ## containerd
@@ -80,18 +74,15 @@ In this tutorial, we will use [containerd](https://github.com/containerd/contain
 To deploy containerd, first of all, we need to download it.
 
 ```bash
-wget -q --show-progress --https-only --timestamping \
-  https://github.com/containerd/containerd/releases/download/v1.4.4/containerd-1.4.4-linux-amd64.tar.gz
+wget https://github.com/containerd/containerd/releases/download/v2.0.4/containerd-2.0.4-linux-amd64.tar.gz
 ```
 
 After download process complete, we need to unzip and move containerd binaries to proper folder
 
 ```bash
-{
-  mkdir containerd
-  tar -xvf containerd-1.4.4-linux-amd64.tar.gz -C containerd
-  sudo mv containerd/bin/* /bin/
-}
+mkdir containerd \
+  && tar -xvf containerd-2.0.4-linux-amd64.tar.gz -C containerd \
+  && mv containerd/bin/* /bin/
 ```
 
 In comparison to the runc, containerd is a service that works like a service that can be called by someone to run a container. It means that we need to run it before we can start communicating with it.
@@ -101,16 +92,25 @@ We will configure containerd as a service.
 To do that, we need to create containerd configuration file
 ```bash
 {
-sudo mkdir -p /etc/containerd/
+mkdir -p /etc/containerd/
 
-cat << EOF | sudo tee /etc/containerd/config.toml
+cat << EOF | tee /etc/containerd/config.toml
+[debug]
+  level = "debug"
+  
 [plugins]
-  [plugins.cri.containerd]
-    snapshotter = "overlayfs"
-    [plugins.cri.containerd.default_runtime]
-      runtime_type = "io.containerd.runtime.v1.linux"
-      runtime_engine = "/usr/local/bin/runc"
-      runtime_root = ""
+  [plugins.'io.containerd.cri.v1.images']
+    snapshotter = "native"
+  [plugins."io.containerd.cri.v1.runtime"]
+    [plugins."io.containerd.cri.v1.runtime".containerd]
+      default_runtime_name = "runc"
+      [plugins."io.containerd.cri.v1.runtime".containerd.runtimes]
+        [plugins."io.containerd.cri.v1.runtime".containerd.runtimes.runc]
+          runtime_type = "io.containerd.runc.v2"
+          snapshotter = "native"
+
+          [plugins."io.containerd.cri.v1.runtime".containerd.runtimes.runc.options]
+            BinaryName = "/usr/local/bin/runc"
 EOF
 }
 ```
@@ -119,14 +119,13 @@ As we can see, we configured containerd to use runc (we installed before) to run
 
 After configuration file create, we need to create containerd service
 ```bash
-cat <<EOF | sudo tee /etc/systemd/system/containerd.service
+cat <<EOF | tee /etc/systemd/system/containerd.service
 [Unit]
 Description=containerd container runtime
 Documentation=https://containerd.io
 After=network.target
 
 [Service]
-ExecStartPre=/sbin/modprobe overlay
 ExecStart=/bin/containerd
 Restart=always
 RestartSec=5
@@ -144,16 +143,14 @@ EOF
 
 And now, run it
 ```bash
-{
-  sudo systemctl daemon-reload
-  sudo systemctl enable containerd
-  sudo systemctl start containerd
-}
+systemctl daemon-reload \
+  && systemctl enable containerd \
+  && systemctl start containerd
 ```
 
 To ensure that our service successfully started, run
 ```bash
-sudo systemctl status containerd
+systemctl status containerd
 ```
 
 Output:
@@ -177,7 +174,7 @@ To do that, we need the tool called [ctr](https://github.com/projectatomic/conta
 
 First of all, we will pull busybox image
 ```bash
-sudo ctr images pull docker.io/library/busybox:latest
+ctr images pull docker.io/library/busybox:latest
 ```
 
 After the pull process is complete - check our image
@@ -193,7 +190,7 @@ docker.io/library/busybox:latest application/vnd.docker.distribution.manifest.li
 
 Now, let's start our container
 ```bash
-ctr run -t --rm --detach docker.io/library/busybox:latest busybox-container sh -c 'echo "Hello from container runned by containerd!"'
+ctr run --detach --snapshotter native docker.io/library/busybox:latest busybox-container sh -c 'while sleep 1; do echo "Hi"; done'
 ```
 
 Output:
@@ -220,22 +217,27 @@ ctr task ls
 Output:
 ```
 TASK                  PID        STATUS
-busybox-container     2862580    STOPPED
+busybox-container     2862580    RUNNING
 ```
 
 As we can see our container is in the stopped state (because the command was successfully executed and the container stopped).
 
 Now, let's clean up our workspace and go to the next section.
+
+Stop running command
+```bash
+kill -9 $(ctr task ls | grep busybox | awk '{print $2}')
+```
+
+And remove the created container
 ```bash
 ctr containers rm busybox-container
 ```
 
 We can check that list of containers and tasks should be empty
 ```bash
-{
-  ctr task ls
-  ctr containers ls
-}
+ctr task ls \
+ && ctr containers ls
 ``` 
 
 We should receive an empty output

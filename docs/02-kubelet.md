@@ -23,20 +23,23 @@ So, let's begin.
 First of all, we need to download kubelet.
 ```bash
 wget -q --show-progress --https-only --timestamping \
-  https://storage.googleapis.com/kubernetes-release/release/v1.21.0/bin/linux/amd64/kubelet
+  https://dl.k8s.io/v1.32.3/bin/linux/amd64/kubelet
 ```
 
 After download process complete, move kubelet binaries to the proper folder
 ```bash
-{
-  chmod +x kubelet 
-  sudo mv kubelet /usr/local/bin/
-}
+chmod +x kubelet \
+  && mv kubelet /usr/local/bin/
+```
+
+Ensure swap is disabled
+```bash
+swapoff -a
 ```
 
 As kubelet is a service that is used to manage pods running on the node, we need to configure that service
 ```bash
-cat <<EOF | sudo tee /etc/systemd/system/kubelet.service
+cat <<EOF | tee /etc/systemd/system/kubelet.service
 [Unit]
 Description=kubelet: The Kubernetes Node Agent
 Documentation=https://kubernetes.io/docs/home/
@@ -45,9 +48,7 @@ After=network-online.target
 
 [Service]
 ExecStart=/usr/local/bin/kubelet \\
-  --container-runtime=remote \\
   --container-runtime-endpoint=unix:///var/run/containerd/containerd.sock \\
-  --image-pull-progress-deadline=2m \\
   --file-check-frequency=10s \\
   --pod-manifest-path='/etc/kubernetes/manifests/' \\
   --v=10
@@ -67,16 +68,14 @@ The main configuration parameters here:
 
 After our service is configured, we can start it
 ```bash
-{
-  sudo systemctl daemon-reload
-  sudo systemctl enable kubelet
-  sudo systemctl start kubelet
-}
+systemctl daemon-reload \
+  && systemctl enable kubelet \
+  && systemctl start kubelet
 ```
 
 To ensure that our service successfully started, run
 ```bash
-sudo systemctl status kubelet
+systemctl status kubelet
 ```
 
 Output:
@@ -100,10 +99,7 @@ After kubelet service is up and running, we can start creating our pods.
 Before we will create static pod manifests, we need to create folders where we will place our pods (same as we configured in kubelet)
 
 ```bash
-{
-  mkdir /etc/kubernetes
-  mkdir /etc/kubernetes/manifests
-}
+mkdir -p /etc/kubernetes/manifests
 ```
 
 After the directory is created, we can create a static pod with busybox container inside 
@@ -182,16 +178,14 @@ In comparison to the ctr (which can work with containerd only), crictl is a tool
 So, let's download crictl binaries
 ```bash
 wget -q --show-progress --https-only --timestamping \
-  https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.21.0/crictl-v1.21.0-linux-amd64.tar.gz
+  https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.32.0/crictl-v1.32.0-linux-amd64.tar.gz
 ```
 
 After the download process is complete, move crictl binaries to the proper folder
 ```bash
-{
-  tar -xvf crictl-v1.21.0-linux-amd64.tar.gz
-  chmod +x crictl 
-  sudo mv crictl /usr/local/bin/
-}
+tar -xvf crictl-v1.32.0-linux-amd64.tar.gz \
+  && chmod +x crictl \
+  && mv crictl /usr/local/bin/
 ```
 
 And configure it a bit
@@ -253,10 +247,8 @@ rm /etc/kubernetes/manifests/static-pod.yml
 
 It takes some time to remove the pods, we can ensure that pods are deleted by running
 ```bash
-{
-  crictl pods
-  crictl ps
-}
+crictl pods \
+  && crictl ps
 ```
 
 The output should be empty.

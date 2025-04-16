@@ -4,7 +4,9 @@ This tutorial is partially based on [Kubernetes The Hard Way](https://github.com
 
 The main focus of this tutorial is to explain the necessity of Kubernetes components. That is why there is no need to configure multiple instances of each component and allow us to set up a single-node Kubernetes cluster. Of course, the cluster created can't be used as a production-ready Kubernetes cluster.
 
-To configure the cluster mentioned, we will use Ubuntu server 20.04 (author uses the VM in Hetzner).
+To run the labs you need one of the following:
+- vm with ubuntu 20.04
+- preconfigured docker container ([here is the manual how to do that](./docs/00-docker.md))
 
 ## Copyright
 
@@ -22,4 +24,3 @@ To configure the cluster mentioned, we will use Ubuntu server 20.04 (author uses
 * [Scheduler](./docs/07-scheduler.md)
 * [Controller manager](./docs/08-controller-manager.md)
 * [Kube-proxy](./docs/09-kubeproxy.md)
-* [DNS in Kubernetes](./docs/10-dns.md)
